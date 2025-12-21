@@ -23,18 +23,8 @@ import { RequestService, createRequestMiddleware } from './request.service'
 import { ChannelService } from './channel.service'
 
 // 导入内置插件
-import {
-  cachePlugin,
-  presetPlugin,
-  billingPlugin,
-  taskPlugin,
-  promptEncodingPlugin,
-  webuiAuthPlugin,
-  dalleConnectorPlugin,
-  sdWebuiConnectorPlugin,
-  fluxConnectorPlugin,
-  chatApiConnectorPlugin
-} from '../plugins'
+import { builtinPlugins } from '../plugins'
+
 
 // 导入插件提供的服务类型
 import type { PresetService } from '../plugins/preset'
@@ -175,26 +165,10 @@ export class MediaLunaService extends Service {
 
   /** 加载内置插件 */
   private async _loadBuiltinPlugins(): Promise<void> {
-    const builtinPlugins: PluginDefinition[] = [
-      // 功能插件
-      cachePlugin,
-      presetPlugin,
-      billingPlugin,
-      taskPlugin,
-      promptEncodingPlugin,
-      webuiAuthPlugin,
-      // 连接器插件
-      dalleConnectorPlugin,
-      sdWebuiConnectorPlugin,
-      fluxConnectorPlugin,
-      chatApiConnectorPlugin
-    ]
-
-    // 使用 loadAll 自动处理依赖排序
     await this._pluginLoader.loadAll(builtinPlugins)
-
     this._logger.info('Loaded %d builtin plugins', builtinPlugins.length)
-  }
+}
+
 
   /** 注册内置设置面板 */
   private _registerBuiltinSettingsPanels(): void {

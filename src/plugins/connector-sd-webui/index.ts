@@ -134,6 +134,9 @@ async function generate(
     seed: Number(seed)
   }
 
+  // 移除可能为空或无效的字段，防止 API 报错
+  if (!negativePrompt) delete requestBody.negative_prompt
+  
   // 如果指定了模型，添加模型覆盖
   if (model) {
     requestBody.override_settings = {

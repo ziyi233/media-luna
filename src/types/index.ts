@@ -177,12 +177,46 @@ export interface MiddlewareDefinition {
 // ============ 连接器相关类型 ============
 
 /** 配置字段类型 */
-export type ConfigFieldType = 'text' | 'password' | 'number' | 'boolean' | 'select' | 'select-remote' | 'textarea'
+export type ConfigFieldType = 'text' | 'password' | 'number' | 'boolean' | 'select' | 'select-remote' | 'textarea' | 'table'
 
 /** 配置字段选项 */
 export interface ConfigFieldOption {
   label: string
   value: string | number | boolean
+}
+
+/** 表格列定义（用于 table 类型字段） */
+export interface TableColumnDefinition {
+  /** 列 key */
+  key: string
+  /** 列标题 */
+  label: string
+  /** 列类型 */
+  type: 'text' | 'number' | 'boolean' | 'select'
+  /** 宽度（可选，如 '120px' 或 '20%'） */
+  width?: string
+  /** 是否必填 */
+  required?: boolean
+  /** 占位符 */
+  placeholder?: string
+  /** 选项（select 类型使用） */
+  options?: ConfigFieldOption[]
+}
+
+/** 表格配置（用于 table 类型字段） */
+export interface TableConfig {
+  /** 是否启用导入功能 */
+  enableImport?: boolean
+  /** 是否启用导出功能 */
+  enableExport?: boolean
+  /** 是否启用批量删除 */
+  enableBatchDelete?: boolean
+  /** 是否启用行选择 */
+  enableSelection?: boolean
+  /** 预设数据源标识（用于加载内置预设） */
+  presetsSource?: string
+  /** 最大行数 */
+  maxRows?: number
 }
 
 /** 配置字段定义 */
@@ -198,6 +232,10 @@ export interface ConfigField {
   description?: string
   /** 条件显示：当指定字段的值满足条件时才显示 */
   showWhen?: { field: string, value: any }
+  /** 表格列定义（type='table' 时使用） */
+  columns?: TableColumnDefinition[]
+  /** 表格配置（type='table' 时使用） */
+  tableConfig?: TableConfig
 }
 
 // 向后兼容的别名
@@ -240,6 +278,30 @@ export interface CardField {
 export type CardDisplayField = CardField
 export type MiddlewareCardField = CardField
 
+/** 连接器请求日志 */
+export interface ConnectorRequestLog {
+  /** API 端点 */
+  endpoint?: string
+  /** 模型名称 */
+  model?: string
+  /** 最终发送的 prompt */
+  prompt: string
+  /** 文件数量 */
+  fileCount?: number
+  /** 其他参数 */
+  parameters?: Record<string, any>
+}
+
+/** 连接器响应日志 */
+export interface ConnectorResponseLog {
+  /** 输出数量 */
+  outputCount: number
+  /** 输出类型 */
+  outputTypes?: AssetKind[]
+  /** API 返回的元数据（如 revised_prompt、seed 等） */
+  meta?: Record<string, any>
+}
+
 /** 连接器定义 */
 export interface ConnectorDefinition {
   /** 唯一标识 */
@@ -259,6 +321,23 @@ export interface ConnectorDefinition {
     files: FileData[],
     prompt: string
   ) => Promise<OutputAsset[]>
+  /**
+   * 获取请求日志（可选）
+   * 返回将要发送给 API 的关键信息，用于 debug 日志
+   * 注意：不要包含敏感信息（API Key 等）
+   */
+  getRequestLog?: (
+    config: Record<string, any>,
+    files: FileData[],
+    prompt: string
+  ) => ConnectorRequestLog
+  /**
+   * 获取响应日志（可选）
+   * 从输出中提取日志信息
+   */
+  getResponseLog?: (
+    output: OutputAsset[]
+  ) => ConnectorResponseLog
 }
 
 // ============ 渠道配置 ============

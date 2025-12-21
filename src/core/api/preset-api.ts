@@ -303,4 +303,25 @@ export function registerPresetApi(ctx: Context): void {
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
   })
+
+  // 清空所有远程同步的预设
+  console.addListener('media-luna/presets/clear-remote', async () => {
+    try {
+      const presetService = ctx.mediaLuna.getService<any>('preset')
+      if (!presetService) {
+        return { success: false, error: 'Preset service not available' }
+      }
+
+      const count = await presetService.deleteAllRemote()
+      return {
+        success: true,
+        data: {
+          deleted: count,
+          message: count > 0 ? `已删除 ${count} 个远程预设` : '没有远程预设需要删除'
+        }
+      }
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
+    }
+  })
 }

@@ -378,7 +378,8 @@ export class PluginLoader {
           id: def.connector.id,
           name: def.connector.name,
           supportedTypes: def.connector.supportedTypes
-        } : undefined
+        } : undefined,
+        presets: def.presets
       })
     }
 

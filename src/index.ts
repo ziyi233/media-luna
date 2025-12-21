@@ -11,7 +11,19 @@ import { registerAllApis } from './core'
 // 导出类型
 export * from './types'
 export { Config } from './config'
-export { MediaLunaService } from './core'
+export { MediaLunaService, definePlugin } from './core'
+
+// 导出外部插件开发所需的核心类型
+export type {
+  PluginDefinition,
+  PluginContext,
+  PluginLogger,
+  PluginInfo,
+  ServiceDefinition,
+  SettingsAction,
+  ConnectorRequestLog,
+  ConnectorResponseLog
+} from './core'
 
 export const name = 'media-luna'
 export const reusable = false

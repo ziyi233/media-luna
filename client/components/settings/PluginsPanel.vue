@@ -99,6 +99,7 @@
           <ConfigRenderer
             :fields="selectedPlugin.configFields"
             v-model="pluginConfig"
+            :presets-map="selectedPlugin.presets"
           />
           <div class="config-actions">
             <k-button type="primary" @click="saveConfig" :loading="saving">
@@ -126,7 +127,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { message } from '@koishijs/client'
+import { message, send } from '@koishijs/client'
 import { pluginApi, PluginInfo } from '../../api'
 import ConfigRenderer from '../ConfigRenderer.vue'
 
@@ -197,8 +198,6 @@ const saveConfig = async () => {
 // 执行操作
 const executeAction = async (action: { apiEvent: string; label: string }) => {
   try {
-    // 操作使用通用的 API 格式
-    const { send } = await import('@koishijs/client')
     const result = await send(action.apiEvent as any) as any
     if (result?.success === false) {
       throw new Error(result.error || '操作失败')

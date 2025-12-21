@@ -234,6 +234,15 @@ export class PresetService {
     return true
   }
 
+  /** 删除所有远程同步的预设 */
+  async deleteAllRemote(): Promise<number> {
+    const remotePresets = await this._ctx.database.get('medialuna_preset', { source: 'api' })
+    if (remotePresets.length === 0) return 0
+
+    await this._ctx.database.remove('medialuna_preset', { source: 'api' })
+    return remotePresets.length
+  }
+
   /** 批量导入预设 */
   async bulkUpsert(presets: Array<Omit<PresetData, 'id'>>, source: 'api' | 'user' = 'api'): Promise<number> {
     let count = 0

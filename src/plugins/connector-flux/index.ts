@@ -138,15 +138,17 @@ async function generate(
     version: modelVersion,
     input: {
       prompt,
-      aspect_ratio: aspectRatio,
-      output_format: outputFormat,
-      output_quality: Number(outputQuality),
       num_outputs: Number(numOutputs),
-      guidance_scale: Number(guidanceScale),
-      num_inference_steps: Number(numInferenceSteps),
       disable_safety_checker: Boolean(disableSafetyChecker)
     }
   }
+
+  // 仅在非默认值或必要时添加可选参数
+  if (aspectRatio) requestBody.input.aspect_ratio = aspectRatio
+  if (outputFormat) requestBody.input.output_format = outputFormat
+  if (outputQuality) requestBody.input.output_quality = Number(outputQuality)
+  if (guidanceScale) requestBody.input.guidance_scale = Number(guidanceScale)
+  if (numInferenceSteps) requestBody.input.num_inference_steps = Number(numInferenceSteps)
 
   if (seed !== undefined && seed !== null && seed !== '') {
     requestBody.input.seed = Number(seed)

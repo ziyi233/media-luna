@@ -53,6 +53,17 @@
             />
           </template>
 
+          <!-- Table 类型（数组对象编辑） -->
+          <template v-else-if="field.type === 'table' && field.columns">
+            <TableFieldEditor
+              :columns="field.columns"
+              :model-value="getTableRows(field.key)"
+              @update:model-value="setFieldValue(field.key, $event)"
+              :table-config="field.tableConfig"
+              :presets="getPresets(field.tableConfig?.presetsSource)"
+            />
+          </template>
+
           <!-- Password 类型 -->
           <template v-else-if="field.type === 'password'">
             <el-input
@@ -83,8 +94,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
-import type { ConfigField } from '../types'
+import { computed, inject } from 'vue'
+import type { ConfigField, TableColumnDefinition } from '../types'
+import TableFieldEditor from './TableFieldEditor.vue'
 
 interface Props {
   /** 配置字段定义 */
@@ -93,10 +105,13 @@ interface Props {
   modelValue: Record<string, any>
   /** 是否显示清除按钮 */
   clearable?: boolean
+  /** 预设数据源（外部注入） */
+  presetsMap?: Record<string, Record<string, any>[]>
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  clearable: false
+  clearable: false,
+  presetsMap: () => ({})
 })
 
 const emit = defineEmits<{
@@ -119,6 +134,20 @@ const shouldShowField = (field: ConfigField) => {
   if (!field.showWhen) return true
   const { field: dependField, value } = field.showWhen
   return props.modelValue[dependField] === value
+}
+
+// ============ Table 类型支持 ============
+
+// 获取表格行数据
+const getTableRows = (key: string): Record<string, any>[] => {
+  const value = props.modelValue[key]
+  return Array.isArray(value) ? value : []
+}
+
+// 获取预设数据
+const getPresets = (source?: string): Record<string, any>[] => {
+  if (!source) return []
+  return props.presetsMap?.[source] || []
 }
 </script>
 

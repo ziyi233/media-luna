@@ -12,9 +12,9 @@ const chatApiFields: ConnectorField[] = [
     label: 'API URL',
     type: 'text',
     required: true,
-    default: 'https://api.openai.com/v1/chat/completions',
-    placeholder: 'https://api.openai.com/v1/chat/completions',
-    description: 'Chat Completions 兼容的 API 端点'
+    default: 'https://api.openai.com/v1',
+    placeholder: 'https://api.openai.com/v1',
+    description: 'OpenAI 兼容 API 的基础 URL（无需包含 /chat/completions）'
   },
   {
     key: 'apiKey',
@@ -347,17 +347,29 @@ async function generate(
     messages.push({ role: 'user', content: prompt })
   }
 
+  // 构建完整 API Endpoint
+  const baseUrl = apiUrl.replace(/\/$/, '')
+  // 如果用户填写了完整路径（以 /chat/completions 结尾），则直接使用
+  // 否则自动拼接 /chat/completions
+  const endpoint = baseUrl.endsWith('/chat/completions') 
+    ? baseUrl 
+    : `${baseUrl}/chat/completions`
+
   // 发送请求
-  const response = await ctx.http.post(apiUrl, {
+  const requestBody: any = {
     model,
     messages,
-    temperature: Number(temperature),
-    top_p: Number(topP),
-    presence_penalty: Number(presencePenalty),
-    frequency_penalty: Number(frequencyPenalty),
     stream: Boolean(stream),
     max_tokens: Number(maxTokens)
-  }, {
+  }
+
+  // 仅在非默认值时添加参数
+  if (temperature != null) requestBody.temperature = Number(temperature)
+  if (topP != null) requestBody.top_p = Number(topP)
+  if (presencePenalty) requestBody.presence_penalty = Number(presencePenalty)
+  if (frequencyPenalty) requestBody.frequency_penalty = Number(frequencyPenalty)
+
+  const response = await ctx.http.post(endpoint, requestBody, {
     headers: {
       'Authorization': `Bearer ${apiKey}`,
       'Content-Type': 'application/json',

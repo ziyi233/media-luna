@@ -43,6 +43,13 @@ export default definePlugin({
       type: 'primary',
       icon: 'sync',
       apiEvent: 'media-luna/presets/sync'
+    },
+    {
+      name: 'clear-remote',
+      label: '清空远程预设',
+      type: 'error',
+      icon: 'delete',
+      apiEvent: 'media-luna/presets/clear-remote'
     }
   ],
 

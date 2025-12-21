@@ -95,14 +95,16 @@ async function generate(
   const requestBody: Record<string, any> = {
     model,
     prompt,
-    size,
     n: Number(n)
   }
 
+  // 仅在非默认值时添加参数
+  if (size) requestBody.size = size
+
   // DALL-E 3 专属参数
   if (model === 'dall-e-3') {
-    requestBody.quality = quality
-    requestBody.style = style
+    if (quality) requestBody.quality = quality
+    if (style) requestBody.style = style
   }
 
   const response = await ctx.http.post(apiUrl, requestBody, {

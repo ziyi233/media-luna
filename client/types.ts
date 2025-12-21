@@ -11,6 +11,8 @@ export type {
   ConfigField,
   ConfigFieldType,
   ConfigFieldOption,
+  TableColumnDefinition,
+  TableConfig,
   CardField,
   CardDisplayField,
   MiddlewareCardField,

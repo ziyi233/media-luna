@@ -43,12 +43,46 @@ export type LifecyclePhase = typeof LIFECYCLE_PHASES[number]
 // ============ 配置字段 ============
 
 /** 配置字段类型 */
-export type ConfigFieldType = 'text' | 'password' | 'number' | 'boolean' | 'select' | 'select-remote' | 'textarea'
+export type ConfigFieldType = 'text' | 'password' | 'number' | 'boolean' | 'select' | 'select-remote' | 'textarea' | 'table'
 
 /** 配置字段选项 */
 export interface ConfigFieldOption {
   label: string
   value: string | number | boolean
+}
+
+/** 表格列定义（用于 table 类型字段） */
+export interface TableColumnDefinition {
+  /** 列 key */
+  key: string
+  /** 列标题 */
+  label: string
+  /** 列类型 */
+  type: 'text' | 'number' | 'boolean' | 'select'
+  /** 宽度（可选，如 '120px' 或 '20%'） */
+  width?: string
+  /** 是否必填 */
+  required?: boolean
+  /** 占位符 */
+  placeholder?: string
+  /** 选项（select 类型使用） */
+  options?: ConfigFieldOption[]
+}
+
+/** 表格配置（用于 table 类型字段） */
+export interface TableConfig {
+  /** 是否启用导入功能 */
+  enableImport?: boolean
+  /** 是否启用导出功能 */
+  enableExport?: boolean
+  /** 是否启用批量删除 */
+  enableBatchDelete?: boolean
+  /** 是否启用行选择 */
+  enableSelection?: boolean
+  /** 预设数据源标识（用于加载内置预设） */
+  presetsSource?: string
+  /** 最大行数 */
+  maxRows?: number
 }
 
 /** 配置字段定义 */
@@ -63,6 +97,10 @@ export interface ConfigField {
   default?: any
   description?: string
   showWhen?: { field: string, value: any }
+  /** 表格列定义（type='table' 时使用） */
+  columns?: TableColumnDefinition[]
+  /** 表格配置（type='table' 时使用） */
+  tableConfig?: TableConfig
 }
 
 // ============ 卡片字段 ============
@@ -320,6 +358,8 @@ export interface PluginDefinition {
   version?: string
   /** 依赖的其他插件 */
   dependencies?: string[]
+  /** Koishi 服务注入声明 */
+  inject?: string[]
 
   // 注册项
   middlewares?: MiddlewareDefinition[]
@@ -333,6 +373,13 @@ export interface PluginDefinition {
   // 前端扩展
   cardFields?: CardField[]
   settingsActions?: SettingsAction[]
+
+  /**
+   * 预设数据源
+   * key 为预设源标识（对应 tableConfig.presetsSource）
+   * value 为预设数据数组
+   */
+  presets?: Record<string, Record<string, any>[]>
 
   // 生命周期
   onLoad?: (ctx: PluginContext) => void | Promise<void>
@@ -360,4 +407,6 @@ export interface PluginInfo {
     name: string
     supportedTypes: ConnectorSupportedType[]
   }
+  /** 预设数据源（用于 table 类型字段的内置预设） */
+  presets?: Record<string, Record<string, any>[]>
 }

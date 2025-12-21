@@ -655,6 +655,13 @@ async execute(mctx, next) {
 | `preset` | 预设系统 | 服务 + 远程同步 + 数据库 |
 | `billing` | 计费系统 | 双中间件（预扣/结算） |
 | `task` | 任务记录 | 数据库操作 + 统计 |
+| `connector-gemini` | Google Gemini 3 (Imagen) 连接器 | `generate` |
+| `connector-midjourney` | Midjourney Proxy 连接器 | `generate` |
+| `connector-stability` | Stability AI (SD3) 连接器 | `generate` |
+| `connector-suno` | Suno AI 音乐生成连接器 | `generate` |
+| `connector-runway` | Runway 视频生成连接器 | `generate` |
+| `connector-comfyui` | ComfyUI 工作流连接器 | `generate` |
+| `connector-modelscope` | ModelScope (魔搭) 连接器 | `generate` |
 | `connector-*` | 各连接器 | 连接器定义示例 |
 
 ---

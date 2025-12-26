@@ -1,325 +1,152 @@
 # Media Luna
 
-中间件驱动的多媒体生成插件，支持插件化扩展和 WebUI 管理。
+> 本项目纯 Vibe Coding 生成，感谢 Claude 大力支持。
 
-## 架构概述
+中间件驱动的多媒体生成插件，支持多种 AI 图像生成服务和 WebUI 管理。
 
-### 核心设计
+## 功能特性
 
-| 特性 | 说明 |
-|------|------|
-| 插件化架构 | 所有功能通过插件系统提供，包括内置连接器和中间件 |
-| 中间件驱动 | 基于 Kahn 算法拓扑排序，支持 before/after 依赖声明 |
-| 配置持久化 | 使用 YAML 文件存储配置，WebUI 管理 |
-| Tag 匹配 | 渠道和预设通过 tag 匹配，用于指令注册 |
+- **多连接器支持**：DALL-E、Stable Diffusion WebUI、Flux、通用 Chat API 等
+- **预设系统**：创建和管理提示词模板，支持远程同步
+- **中间件管道**：灵活的请求处理流程，支持计费、缓存、翻译等
+- **WebUI 管理**：通过 Koishi Console 进行可视化配置
+- **任务记录**：完整的生成历史和统计
 
-### 生命周期阶段
+## 安装
 
-```
-prepare → pre-request → request → post-request → finalize
-   ↓          ↓           ↓           ↓            ↓
- 验证/初始化  预设/翻译   调用连接器   输出处理    计费/记录
-```
-
-### 插件系统
-
-Media Luna 采用完全插件化的架构，所有功能（包括内置功能）都通过插件提供：
-
-**内置插件：**
-
-| 插件 ID | 类型 | 说明 |
-|---------|------|------|
-| `cache` | 功能 | 资源缓存服务 |
-| `preset` | 功能 | 预设管理和远程同步 |
-| `billing` | 功能 | 计费中间件 |
-| `task` | 功能 | 任务记录 |
-| `prompt-encoding` | 功能 | 提示词编码检测 |
-| `connector-dalle` | 连接器 | OpenAI DALL-E |
-| `connector-sd-webui` | 连接器 | Stable Diffusion WebUI |
-| `connector-flux` | 连接器 | Flux API |
-| `connector-chat-api` | 连接器 | 通用 Chat API |
-
-## 目录结构
-
-```
-src/
-├── index.ts                 # 插件入口
-├── config.ts                # Koishi Schema 配置
-├── database.ts              # 数据库表扩展
-│
-├── types/
-│   ├── index.ts             # 核心类型定义（前后端共享）
-│   └── augmentations.d.ts   # Koishi 模块扩展
-│
-├── core/                    # 核心框架
-│   ├── index.ts             # 统一导出
-│   ├── types.ts             # 核心类型
-│   ├── error.ts             # 错误处理
-│   ├── logger.ts            # 日志工具
-│   ├── plugin-loader.ts     # 插件加载器
-│   ├── medialuna.service.ts # 主服务 (ctx.mediaLuna)
-│   ├── channel.service.ts   # 渠道 CRUD
-│   ├── request.service.ts   # 请求服务
-│   ├── config/              # 配置服务 (YAML)
-│   ├── pipeline/            # 管道系统
-│   │   ├── dependency-graph.ts
-│   │   ├── middleware-registry.ts
-│   │   └── generation-pipeline.ts
-│   └── registry/            # 注册中心
-│       ├── connector.registry.ts
-│       └── service.registry.ts
-│
-├── plugins/                 # 内置插件
-│   ├── cache/               # 资源缓存
-│   ├── preset/              # 预设管理
-│   ├── billing/             # 计费
-│   ├── task/                # 任务记录
-│   ├── prompt-encoding/     # 提示词编码
-│   ├── connector-dalle/     # DALL-E 连接器
-│   ├── connector-sd-webui/  # SD WebUI 连接器
-│   ├── connector-flux/      # Flux 连接器
-│   └── connector-chat-api/  # Chat API 连接器
-│
-└── api/                     # WebSocket API
-    ├── index.ts             # API 注册入口
-    ├── channel-api.ts       # 渠道管理
-    ├── preset-api.ts        # 预设管理
-    ├── task-api.ts          # 任务管理
-    ├── middleware-api.ts    # 中间件配置
-    ├── connector-api.ts     # 连接器查询
-    ├── settings-api.ts      # 设置面板
-    ├── cache-api.ts         # 缓存管理
-    └── plugin-api.ts        # 插件管理
-
-client/                      # 前端 (Vue)
-├── index.ts                 # 前端入口
-├── types.ts                 # 类型定义
-├── api.ts                   # API 调用封装
-└── components/              # Vue 组件
+```bash
+# 通过 Koishi 插件市场安装
+# 或手动安装
+npm install koishi-plugin-media-luna
 ```
 
-## 类型系统
+## 快速开始
 
-### 插件定义 (PluginDefinition)
+### 1. 安装并启用插件
 
-```typescript
-import { definePlugin } from './core'
+在 Koishi 控制台的插件市场搜索 `media-luna` 并安装。
 
-export default definePlugin({
-  id: 'my-plugin',
-  name: '我的插件',
-  description: '插件描述',
-  version: '1.0.0',
+### 2. 配置连接器
 
-  // 配置字段（在插件设置页显示）
-  configFields: [
-    { key: 'apiKey', label: 'API Key', type: 'password', required: true }
-  ],
+进入 Media Luna 的设置页面，在「插件」标签页启用并配置所需的连接器：
 
-  // 声明式中间件注册
-  middlewares: [
-    {
-      name: 'my-middleware',
-      displayName: '我的中间件',
-      phase: 'lifecycle-pre-request',
-      after: ['preset'],
-      execute: async (context, next) => {
-        // 处理逻辑
-        return next()
-      }
-    }
-  ],
+- **DALL-E**：需要 OpenAI API Key
+- **SD WebUI**：需要 Stable Diffusion WebUI 的地址
+- **Flux**：需要 Flux API 地址和密钥
+- **Chat API**：支持兼容 OpenAI 格式的图像生成 API
 
-  // 声明式连接器注册
-  connector: {
-    id: 'my-connector',
-    name: 'My Connector',
-    supportedTypes: ['image'],
-    fields: [...],
-    generate: async (ctx, config, files, prompt) => {
-      // 返回 OutputAsset[]
-    }
-  },
+### 3. 创建渠道
 
-  // 初始化钩子
-  async setup(ctx, api) {
-    // 注册服务、事件监听等
-  }
-})
+在「渠道」页面创建新渠道：
+
+1. 填写渠道名称（如 `dalle`）
+2. 选择连接器
+3. 配置连接器参数（API Key、模型等）
+4. 添加标签（用于指令匹配）
+
+### 4. 创建预设（可选）
+
+在「预设」页面创建提示词模板：
+
+```
+realistic photo, {{userText}}, high quality, 8k, detailed
 ```
 
-### 配置字段 (ConfigField)
+`{{userText}}` 会被用户输入的提示词替换。
 
-```typescript
-interface ConfigField {
-  key: string                    // 字段标识
-  label: string                  // 显示标签
-  type: ConfigFieldType          // 字段类型
-  required?: boolean             // 是否必填
-  default?: any                  // 默认值
-  description?: string           // 描述文本
-  options?: ConfigFieldOption[]  // select 类型的选项
-  showWhen?: { field: string, value: any }  // 条件显示
-}
+### 5. 使用
 
-type ConfigFieldType = 'text' | 'password' | 'number' | 'boolean' | 'select' | 'select-remote' | 'textarea'
+在聊天中使用命令生成图片：
+
+```
+画图 一只可爱的猫咪
 ```
 
-### 卡片展示字段 (CardField)
+或通过 WebUI 的「生成」页面直接生成。
 
-```typescript
-interface CardField {
-  source: 'channel' | 'connectorConfig' | 'middlewareOverride'
-  key: string
-  label: string
-  format?: 'text' | 'password-mask' | 'number' | 'size' | 'boolean' | 'currency'
-  suffix?: string
-  configGroup?: string
-}
-```
+## 配置说明
 
-## API 参考
+### 插件配置
 
-### 执行 API
+在 Koishi 插件配置页面可以设置：
 
-```typescript
-// 通过渠道 ID 生成
-const result = await ctx.mediaLuna.generate({
-  channel: 1,
-  prompt: 'a cat',
-  files: [],
-  parameters: { preset: 'anime' }
-})
+| 配置项 | 说明 | 默认值 |
+|--------|------|--------|
+| logLevel | 日志级别 | info |
 
-// 通过渠道名生成
-const result = await ctx.mediaLuna.generateByName({
-  channelName: 'dalle',
-  presetName: 'anime',
-  prompt: 'a cat',
-  session
-})
-```
+### 连接器配置
 
-### 查询 API
-
-```typescript
-// 渠道服务
-ctx.mediaLuna.channels.list()
-ctx.mediaLuna.channels.getById(id)
-ctx.mediaLuna.channels.create(data)
-
-// 预设服务（通过插件提供）
-ctx.mediaLuna.presets?.list()
-ctx.mediaLuna.presets?.getMatchingPresets(tags)
-
-// 任务服务（通过插件提供）
-ctx.mediaLuna.tasks?.query(options)
-ctx.mediaLuna.tasks?.getById(id)
-
-// 缓存服务（通过插件提供）
-ctx.mediaLuna.cache?.get(id)
-ctx.mediaLuna.cache?.cache(buffer, mimeType)
-
-// 注册中心
-ctx.mediaLuna.connectors.list()
-ctx.mediaLuna.middlewares.list()
-
-// 插件加载器
-ctx.mediaLuna.pluginLoader.getPluginInfos()
-```
-
-### 注册 API
-
-```typescript
-// 注册连接器
-ctx.mediaLuna.registerConnector(connectorDefinition)
-
-// 注册中间件
-ctx.mediaLuna.registerMiddleware(middlewareDefinition)
-
-// 注册前端扩展
-ctx.mediaLuna.registerFrontendExtension(extension)
-
-// 注册设置面板
-ctx.mediaLuna.registerSettingsPanel(panel)
-```
-
-## 数据库表
-
-| 表名 | 说明 |
-|------|------|
-| medialuna_channel | 渠道配置 |
-| medialuna_preset | 预设模板 |
-| medialuna_task | 任务记录 |
-| medialuna_user | 用户表 |
-| medialuna_user_binding | 用户平台绑定 |
-| medialuna_asset_cache | 资源缓存 |
-
-## 配置文件
-
-配置存储在 `data/media-luna/config.yaml`：
-
-```yaml
-middlewares:
-  billing-prepare:
-    enabled: true
-    config: {}
-  storage:
-    enabled: true
-    config:
-      backend: local
-      localCacheDir: data/media-luna/assets
-      localPublicPath: /media-luna/assets
-
-remote-presets:
-  apiUrl: https://prompt.vioaki.xyz/api/templates?per_page=-1
-  autoSync: false
-  syncInterval: 60
-  deleteRemoved: false
-```
-
-## WebSocket API 端点
-
-所有 API 通过 Koishi Console WebSocket 通信，事件名格式：`media-luna/{模块}/{操作}`
-
-### 渠道管理
-
-- `media-luna/channels/list` - 获取渠道列表
-- `media-luna/channels/get` - 获取单个渠道
-- `media-luna/channels/create` - 创建渠道
-- `media-luna/channels/update` - 更新渠道
-- `media-luna/channels/delete` - 删除渠道
-
-### 预设管理
-
-- `media-luna/presets/list` - 获取预设列表
-- `media-luna/presets/get` - 获取单个预设
-- `media-luna/presets/create` - 创建预设
-- `media-luna/presets/update` - 更新预设
-- `media-luna/presets/delete` - 删除预设
-- `media-luna/presets/sync` - 同步远程预设
-
-### 任务管理
-
-- `media-luna/tasks/list` - 获取任务列表
-- `media-luna/tasks/get` - 获取任务详情
-- `media-luna/tasks/delete` - 删除任务
-- `media-luna/tasks/stats` - 获取统计
-- `media-luna/tasks/cleanup` - 清理旧任务
+各连接器的详细配置请参考对应的设置页面。
 
 ### 中间件配置
 
-- `media-luna/middlewares/list` - 获取中间件列表
-- `media-luna/middlewares/get` - 获取中间件配置
-- `media-luna/middlewares/update` - 更新配置
-- `media-luna/middlewares/execution-order` - 获取执行顺序
+在「设置」→「中间件」页面配置各中间件的行为：
 
-### 插件管理
+- **计费 (billing)**：启用/禁用计费，配置货币提供者
+- **预设 (preset)**：自动应用预设模板
+- **缓存 (cache)**：资源缓存设置
+- **任务记录 (task)**：任务保留时间
 
-- `media-luna/plugins/list` - 获取插件列表
-- `media-luna/plugins/enable` - 启用插件
-- `media-luna/plugins/disable` - 禁用插件
-- `media-luna/plugins/update-config` - 更新插件配置
+## WebUI 页面
+
+| 页面 | 功能 |
+|------|------|
+| 生成 | 直接在浏览器中生成图片 |
+| 渠道 | 管理生成渠道配置 |
+| 预设 | 管理提示词预设模板 |
+| 任务 | 查看生成历史和统计 |
+| 设置 | 全局设置和插件配置 |
+
+## 指令使用说明
+
+### 查询指令
+
+| 指令 | 说明 |
+|------|------|
+| `models` | 查看所有可用模型名 |
+| `presets` | 查看所有预设名 |
+| `preset <预设名>` | 查看具体预设内容 |
+| `loras` | 查看已挑选的 LoRA 列表 |
+| `mytasks` | 查看我的任务列表 |
+| `taskinfo <id>` | 查看任务详情 |
+
+### 基础用法
+
+**格式：** `渠道名 [预设名] 文字 [图片...]`
+
+1. **完整指定**：`渠道名 预设名 文字 【图片1】【图片2】`
+   - 附带 2 张或以上图片时直接触发画图
+
+2. **省略预设**：`渠道名 文字 【图片1】【图片2】`
+   - 无需指定预设也能触发（文字不能正好等于预设名）
+
+3. **收集模式**：`渠道名 预设名 文字 【图片1】`
+   - 图片少于 2 张时进入收集模式
+   - 收集接下来的消息，用户发送「开始」触发画图
+
+4. **引用消息**：引用消息发指令时，被引用的消息和引用消息视为一条消息，遵循上述规则
+
+### 高级用法
+
+1. **@用户**：所有 @ 会被替换为对应用户的头像
+
+2. **LoRA 指定**：模型 `qwen image` 和 `z-image` 系列支持使用 `#lora名#` 指定 LoRA
+   - 格式：`#xx/xxxx#`
+   - 可用 LoRA 列表：[ModelScope](https://www.modelscope.cn/models?tabKey=other&baseModel=adapter:MusePublic/Qwen-image)（约 8000+ 个）
+
+3. **提示词润色**：在提示词中包含「润色」，会自动调用 AI 模型优化提示词
+   - 仅 `qwen image` 和 `z-image` 系列支持
+
+4. **分辨率指定**：在提示词中包含分辨率相关词汇
+   - 支持格式：`1024x1024`、`9:16`、`横屏`、`竖屏` 等
+   - 注意：并非所有模型都支持此功能
+
+## 文档
+
+更多详细文档请查看 [docs/](./docs/) 目录：
+
+- [架构文档](./docs/architecture.md) - 插件架构和 API 参考
+- [WebUI 开发文档](./docs/webui.md) - 前端开发指南
 
 ## License
 

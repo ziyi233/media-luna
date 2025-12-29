@@ -6,13 +6,31 @@
           <template #icon><k-icon name="add"></k-icon></template>
           新建渠道
         </k-button>
+        <ConnectorFilter
+          v-model="selectedConnectors"
+          :connectors="connectors"
+          :get-icon-url="getConnectorIconUrlByDef"
+        />
         <TagFilter
           v-model="selectedTags"
           :all-tags="allTags"
           :preset-tags="presetTags"
+          :show-input="false"
         />
+        <SortSelect v-model="sortBy" />
       </div>
       <div class="ml-header-right">
+        <div class="search-wrapper">
+          <el-input
+            v-model="searchQuery"
+            placeholder="搜索渠道..."
+            size="small"
+            clearable
+            class="search-input"
+          >
+            <template #prefix><k-icon name="search"></k-icon></template>
+          </el-input>
+        </div>
         <ViewModeSwitch v-model="viewMode" />
       </div>
     </div>
@@ -23,11 +41,26 @@
       <!-- 卡片视图 -->
       <div v-else-if="viewMode === 'card'" class="ml-grid">
         <div v-for="channel in filteredChannels" :key="channel.id">
-          <div class="ml-card ml-card--clickable" @click="openEditDialog(channel)">
+          <div
+            class="ml-card ml-card--clickable"
+            :class="{ 'ml-card--disabled': !channel.enabled }"
+            @click="openEditDialog(channel)"
+          >
             <div class="card-header">
               <div class="header-main">
-                <div class="channel-name">
-                  {{ channel.name }}
+                <div class="channel-title">
+                  <div class="connector-logo">
+                    <img
+                      v-if="getConnectorIconUrl(channel.connectorId)"
+                      :src="getConnectorIconUrl(channel.connectorId)"
+                      :alt="getConnectorName(channel.connectorId)"
+                    />
+                    <k-icon v-else name="link"></k-icon>
+                  </div>
+                  <div class="channel-info">
+                    <div class="channel-name">{{ channel.name }}</div>
+                    <div class="connector-name">{{ getConnectorName(channel.connectorId) }}</div>
+                  </div>
                 </div>
                 <el-switch v-model="channel.enabled" size="small" @change="toggleEnable(channel)" @click.stop />
               </div>
@@ -40,12 +73,9 @@
                   <k-icon name="voice"></k-icon>
                   {{ getSpeakerId(channel.id) }}
                 </span>
-                <span class="connector-badge">
-                  <k-icon name="link"></k-icon> {{ getConnectorName(channel.connectorId) }}
-                </span>
                 <!-- 中间件字段（如费用）显示在标题旁 -->
                 <template v-for="field in middlewareCardFields" :key="`mw-${field.key}`">
-                  <span class="cost-badge" v-if="field.key === 'cost'">
+                  <span class="cost-badge" v-if="field.key === 'cost' && getCardFieldValue(channel, field)">
                     {{ formatFieldValue(getCardFieldValue(channel, field), field.format, getCurrencySuffix(channel, field)) }}
                   </span>
                 </template>
@@ -57,7 +87,7 @@
               <div class="field-list" v-if="getCardFields(channel).length">
                 <div v-for="field in getCardFields(channel)" :key="field.key" class="field-item">
                   <span class="field-label">{{ field.label }}</span>
-                  <span class="field-value">{{ formatFieldValue(channel.connectorConfig[field.key], field.format) }}</span>
+                  <span class="field-value">{{ formatCardFieldValue(channel, field) }}</span>
                 </div>
               </div>
 
@@ -79,6 +109,19 @@
               </k-button>
             </div>
           </div>
+        </div>
+
+        <!-- 空状态 -->
+        <div v-if="filteredChannels.length === 0 && !loading" class="empty-state">
+          <div class="empty-icon">📭</div>
+          <div class="empty-text" v-if="channels.length === 0">还没有创建任何渠道</div>
+          <div class="empty-text" v-else>没有找到匹配的渠道</div>
+          <k-button v-if="channels.length === 0" type="primary" @click="openCreateDialog">
+            创建第一个渠道
+          </k-button>
+          <k-button v-else @click="clearFilters">
+            清除筛选条件
+          </k-button>
         </div>
       </div>
 
@@ -105,7 +148,15 @@
                 <span class="name-text">{{ channel.name }}</span>
               </td>
               <td class="col-connector">
-                <span class="connector-badge">{{ getConnectorName(channel.connectorId) }}</span>
+                <span class="connector-badge">
+                  <img
+                    v-if="getConnectorIconUrl(channel.connectorId)"
+                    :src="getConnectorIconUrl(channel.connectorId)"
+                    class="connector-icon"
+                    :alt="getConnectorName(channel.connectorId)"
+                  />
+                  {{ getConnectorName(channel.connectorId) }}
+                </span>
               </td>
               <td class="col-tags">
                 <div class="tags-wrapper">
@@ -156,6 +207,8 @@ import { message } from '@koishijs/client'
 import { ChannelConfig, ConfigField, ConnectorDefinition, CardField } from '../types'
 import { channelApi, connectorApi, middlewareApi } from '../api'
 import TagFilter from './TagFilter.vue'
+import ConnectorFilter from './ConnectorFilter.vue'
+import SortSelect, { type SortValue } from './SortSelect.vue'
 import ViewModeSwitch, { type ViewMode } from './ViewModeSwitch.vue'
 import ChannelConfigDialog from './ChannelConfigDialog.vue'
 import LoadingState from './LoadingState.vue'
@@ -173,6 +226,9 @@ const middlewareGlobalConfigs = ref<Record<string, Record<string, any>>>({})
 const dialogVisible = ref(false)
 const editingChannel = ref<ChannelConfig | null>(null)
 const selectedTags = ref<string[]>([])
+const selectedConnectors = ref<string[]>([])
+const sortBy = ref<SortValue>('default')
+const searchQuery = ref('')
 
 // 从所有渠道中提取标签
 const allTags = computed(() => {
@@ -183,18 +239,87 @@ const allTags = computed(() => {
   return Array.from(tagSet).sort()
 })
 
-// 计算属性
+// 计算属性 - 筛选、搜索、排序
 const filteredChannels = computed(() => {
-  if (selectedTags.value.length === 0) return channels.value
-  return channels.value.filter(c =>
-    selectedTags.value.every(tag => (c.tags || []).includes(tag))
-  )
+  let result = channels.value
+
+  // 1. 连接器筛选 (OR 逻辑)
+  if (selectedConnectors.value.length > 0) {
+    result = result.filter(c => selectedConnectors.value.includes(c.connectorId))
+  }
+
+  // 2. 标签筛选 (AND 逻辑)
+  if (selectedTags.value.length > 0) {
+    result = result.filter(c =>
+      selectedTags.value.every(tag => (c.tags || []).includes(tag))
+    )
+  }
+
+  // 3. 搜索过滤
+  if (searchQuery.value.trim()) {
+    const query = searchQuery.value.toLowerCase().trim()
+    result = result.filter(c => {
+      // 搜索名称
+      if (c.name.toLowerCase().includes(query)) return true
+      // 搜索连接器名称
+      const connectorName = getConnectorName(c.connectorId).toLowerCase()
+      if (connectorName.includes(query)) return true
+      // 搜索标签
+      if ((c.tags || []).some(t => t.toLowerCase().includes(query))) return true
+      return false
+    })
+  }
+
+  // 4. 排序
+  if (sortBy.value !== 'default') {
+    result = [...result].sort((a, b) => {
+      switch (sortBy.value) {
+        case 'name-asc':
+          return a.name.localeCompare(b.name, 'zh-CN')
+        case 'name-desc':
+          return b.name.localeCompare(a.name, 'zh-CN')
+        case 'enabled-first':
+          return (b.enabled ? 1 : 0) - (a.enabled ? 1 : 0)
+        case 'disabled-first':
+          return (a.enabled ? 1 : 0) - (b.enabled ? 1 : 0)
+        default:
+          return 0
+      }
+    })
+  }
+
+  return result
 })
 
 // 方法
 const getConnectorName = (id: string) => {
   const c = connectors.value.find(x => x.id === id)
   return c ? c.name : id
+}
+
+/** 获取连接器图标 URL (通过 connectorId) */
+const getConnectorIconUrl = (connectorId: string): string => {
+  const connector = connectors.value.find(c => c.id === connectorId)
+  if (!connector?.icon) return ''
+
+  // chatluna 和 edge-tts 使用 PNG 格式
+  if (connector.icon === 'chatluna' || connector.icon === 'edge-tts') {
+    return new URL(`../assets/connector-icons/${connector.icon}.png`, import.meta.url).href
+  }
+  // 其他图标使用 SVG 格式
+  return new URL(`../assets/connector-icons/${connector.icon}.svg`, import.meta.url).href
+}
+
+/** 获取连接器图标 URL (通过 ConnectorDefinition) */
+const getConnectorIconUrlByDef = (connector: ConnectorDefinition): string => {
+  if (!connector?.icon) return ''
+
+  // chatluna 和 edge-tts 使用 PNG 格式
+  if (connector.icon === 'chatluna' || connector.icon === 'edge-tts') {
+    return new URL(`../assets/connector-icons/${connector.icon}.png`, import.meta.url).href
+  }
+  // 其他图标使用 SVG 格式
+  return new URL(`../assets/connector-icons/${connector.icon}.svg`, import.meta.url).href
 }
 
 /** 获取渠道卡片需要展示的字段 */
@@ -286,6 +411,41 @@ const formatFieldValue = (value: any, format?: string, suffix?: string): string 
   }
 
   return suffix ? `${result} ${suffix}` : result
+}
+
+/** 格式化卡片字段值（从连接器 options 查找友好名称） */
+const formatCardFieldValue = (channel: ChannelConfig, field: { key: string, format?: string }): string => {
+  const value = channel.connectorConfig?.[field.key]
+  if (value === undefined || value === null || value === '') {
+    return '-'
+  }
+
+  // 尝试从连接器的 options 中查找友好名称
+  const connector = connectors.value.find(c => c.id === channel.connectorId)
+  if (connector) {
+    const fieldDef = connector.fields.find(f => f.key === field.key)
+    if (fieldDef?.options) {
+      const option = fieldDef.options.find(o => o.value === value)
+      if (option?.label) {
+        return option.label
+      }
+    }
+  }
+
+  // 如果值太长，截断显示
+  if (typeof value === 'string' && value.length > 25) {
+    return value.substring(0, 22) + '...'
+  }
+
+  return formatFieldValue(value, field.format)
+}
+
+/** 清除所有筛选条件 */
+const clearFilters = () => {
+  selectedConnectors.value = []
+  selectedTags.value = []
+  searchQuery.value = ''
+  sortBy.value = 'default'
 }
 
 /** Speaker ID 基数 */
@@ -394,6 +554,15 @@ onMounted(() => {
 <style scoped>
 @import '../styles/shared.css';
 
+/* ========== 搜索框样式 ========== */
+.search-wrapper {
+  flex-shrink: 0;
+}
+
+.search-input {
+  width: 180px;
+}
+
 /* ========== 渠道卡片特有样式 ========== */
 
 /* 卡片内部布局 */
@@ -417,13 +586,55 @@ onMounted(() => {
   flex-wrap: wrap;
 }
 
-.channel-name {
-  font-size: 1.1rem;
-  font-weight: 600;
-  color: var(--k-color-text);
+/* 渠道标题区域（Logo + 名称信息） */
+.channel-title {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.75rem;
+}
+
+.connector-logo {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--k-color-bg-2);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.connector-logo img {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+}
+
+.connector-logo .k-icon {
+  font-size: 1.5rem;
+  color: var(--k-color-text-description);
+}
+
+.channel-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.channel-name {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--k-color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.connector-name {
+  font-size: 0.75rem;
+  color: var(--k-color-text-description);
 }
 
 .speaker-id-badge {
@@ -469,6 +680,13 @@ onMounted(() => {
   border-radius: 4px;
   font-size: 0.8rem;
   color: var(--k-color-text-description);
+}
+
+.connector-icon {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+  border-radius: 3px;
 }
 
 .cost-badge {
@@ -593,5 +811,45 @@ onMounted(() => {
 .action-btns {
   display: flex;
   gap: 0.5rem;
+}
+
+/* ========== 禁用状态卡片样式 ========== */
+.ml-card--disabled {
+  opacity: 0.6;
+  background-color: var(--k-color-bg-2);
+}
+
+.ml-card--disabled .connector-logo {
+  filter: grayscale(0.6);
+}
+
+.ml-card--disabled .channel-name {
+  color: var(--k-color-text-description);
+}
+
+.ml-card--disabled:hover {
+  opacity: 0.8;
+}
+
+/* ========== 空状态样式 ========== */
+.empty-state {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 4rem 2rem;
+  text-align: center;
+  gap: 1rem;
+}
+
+.empty-icon {
+  font-size: 3rem;
+  opacity: 0.6;
+}
+
+.empty-text {
+  font-size: 1rem;
+  color: var(--k-color-text-description);
 }
 </style>

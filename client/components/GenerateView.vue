@@ -2,27 +2,66 @@
   <div class="generate-layout">
         <!-- 左侧配置区 -->
         <div class="config-panel">
-          <k-card class="config-card">
+          <k-card class="config-card ml-scrollbar">
             <div class="form-section">
               <div class="section-title">
                 <k-icon name="settings"></k-icon> 基础配置
               </div>
 
+              <!-- 渠道选择触发器 -->
               <div class="form-item">
                 <div class="label">生成渠道</div>
-                <el-select v-model="form.channel" placeholder="选择生成渠道" style="width: 100%">
-                  <el-option
-                    v-for="channel in channels"
-                    :key="channel.id"
-                    :label="channel.name"
-                    :value="channel.id"
-                  />
-                </el-select>
+                <div
+                  class="selection-trigger"
+                  :class="{ active: pickerMode === 'channel', selected: !!selectedChannel }"
+                  @click="togglePickerMode('channel')"
+                >
+                  <template v-if="selectedChannel">
+                    <div class="selection-info">
+                      <img
+                        v-if="getConnectorIconUrl(selectedChannel.connectorId)"
+                        :src="getConnectorIconUrl(selectedChannel.connectorId)"
+                        class="selection-icon"
+                      />
+                      <component v-else :is="icons.channels" class="selection-icon-fallback"></component>
+                      <span class="selection-name">{{ selectedChannel.name }}</span>
+                    </div>
+                    <k-icon name="times" class="clear-btn" @click.stop="clearChannel" title="清除"></k-icon>
+                  </template>
+                  <template v-else>
+                    <component :is="icons.channels" class="placeholder-icon"></component>
+                    <span class="placeholder-text">点击选择渠道</span>
+                    <k-icon name="chevron-right" class="arrow-icon"></k-icon>
+                  </template>
+                </div>
               </div>
 
+              <!-- 预设选择触发器 -->
               <div class="form-item">
-                <div class="label">预设模板</div>
-                <PresetPicker v-model="presetId" :presets="presets" />
+                <div class="label">预设模板 <span class="optional">(可选)</span></div>
+                <div
+                  class="selection-trigger"
+                  :class="{ active: pickerMode === 'preset', selected: !!selectedPreset }"
+                  @click="togglePickerMode('preset')"
+                >
+                  <template v-if="selectedPreset">
+                    <div class="selection-info">
+                      <img
+                        v-if="selectedPreset.thumbnail"
+                        :src="selectedPreset.thumbnail"
+                        class="selection-thumb"
+                      />
+                      <component v-else :is="icons.presets" class="selection-icon-fallback"></component>
+                      <span class="selection-name">{{ selectedPreset.name }}</span>
+                    </div>
+                    <k-icon name="times" class="clear-btn" @click.stop="clearPreset" title="清除"></k-icon>
+                  </template>
+                  <template v-else>
+                    <component :is="icons.presets" class="placeholder-icon"></component>
+                    <span class="placeholder-text">点击选择预设</span>
+                    <k-icon name="chevron-right" class="arrow-icon"></k-icon>
+                  </template>
+                </div>
               </div>
             </div>
 
@@ -85,10 +124,146 @@
           </k-card>
         </div>
 
-        <!-- 右侧预览区 -->
-        <div class="preview-panel">
+        <!-- 中间区域 -->
+        <div class="preview-panel ml-scrollbar">
+          <!-- 渠道选择列表 -->
+          <div v-if="pickerMode === 'channel'" class="picker-view">
+            <div class="picker-header">
+              <div class="picker-title-row">
+                <div class="picker-title">
+                  <k-icon name="link"></k-icon>
+                  <span>选择渠道</span>
+                  <span class="picker-count">{{ filteredChannels.length }}</span>
+                </div>
+                <k-button size="mini" @click="pickerMode = null" class="picker-close-btn">
+                  <template #icon><k-icon name="times"></k-icon></template>
+                </k-button>
+              </div>
+              <div class="picker-filters">
+                <el-input
+                  v-model="channelSearch"
+                  placeholder="搜索..."
+                  size="small"
+                  clearable
+                  class="picker-search"
+                >
+                  <template #prefix><k-icon name="search"></k-icon></template>
+                </el-input>
+                <el-select
+                  v-model="channelConnectorFilter"
+                  placeholder="全部连接器"
+                  clearable
+                  size="small"
+                  class="picker-filter"
+                >
+                  <el-option
+                    v-for="conn in connectors"
+                    :key="conn.id"
+                    :label="conn.name"
+                    :value="conn.id"
+                  />
+                </el-select>
+              </div>
+            </div>
+            <div class="picker-grid">
+              <div
+                v-for="channel in filteredChannels"
+                :key="channel.id"
+                class="picker-card"
+                :class="{ selected: form.channel === channel.id }"
+                @click="selectChannel(channel)"
+              >
+                <div class="picker-card-icon">
+                  <img
+                    v-if="getConnectorIconUrl(channel.connectorId)"
+                    :src="getConnectorIconUrl(channel.connectorId)"
+                  />
+                  <k-icon v-else name="link"></k-icon>
+                </div>
+                <div class="picker-card-name">{{ channel.name }}</div>
+                <k-icon v-if="form.channel === channel.id" name="check" class="picker-card-check"></k-icon>
+              </div>
+              <div v-if="filteredChannels.length === 0" class="picker-empty">
+                <k-icon name="search"></k-icon>
+                <span>没有找到匹配的渠道</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 预设选择列表 -->
+          <div v-else-if="pickerMode === 'preset'" class="picker-view">
+            <div class="picker-header">
+              <div class="picker-title-row">
+                <div class="picker-title">
+                  <k-icon name="bookmark"></k-icon>
+                  <span>选择预设</span>
+                  <span class="picker-count">{{ filteredPresetsCount }}</span>
+                </div>
+                <k-button size="mini" @click="pickerMode = null" class="picker-close-btn">
+                  <template #icon><k-icon name="times"></k-icon></template>
+                </k-button>
+              </div>
+              <div class="picker-filters">
+                <el-input
+                  v-model="presetSearch"
+                  placeholder="搜索..."
+                  size="small"
+                  clearable
+                  class="picker-search"
+                >
+                  <template #prefix><k-icon name="search"></k-icon></template>
+                </el-input>
+                <el-select
+                  v-model="presetSourceFilter"
+                  placeholder="全部来源"
+                  clearable
+                  size="small"
+                  class="picker-filter"
+                >
+                  <el-option label="本地" value="user" />
+                  <el-option label="远程" value="api" />
+                </el-select>
+              </div>
+            </div>
+            <div class="preset-picker-content ml-scrollbar">
+              <div class="ml-masonry">
+                <template v-for="preset in presets" :key="preset.id">
+                  <div v-if="matchPresetFilter(preset)" class="ml-masonry-item">
+                    <div
+                      class="preset-picker-card"
+                      :class="{ selected: presetId === preset.id }"
+                      @click="selectPreset(preset)"
+                    >
+                      <!-- 缩略图 -->
+                      <div class="card-thumb" v-if="preset.thumbnail">
+                        <img :src="preset.thumbnail" loading="lazy" />
+                      </div>
+                      <div class="card-thumb empty" v-else>
+                        <k-icon name="image"></k-icon>
+                      </div>
+                      <!-- 底部信息 -->
+                      <div class="card-info">
+                        <div class="card-name">{{ preset.name }}</div>
+                      </div>
+                      <!-- 来源标记 -->
+                      <div class="card-source" :class="preset.source">
+                        {{ preset.source === 'api' ? '远程' : '本地' }}
+                      </div>
+                      <!-- 选中标记 -->
+                      <k-icon v-if="presetId === preset.id" name="check" class="card-check"></k-icon>
+                    </div>
+                  </div>
+                </template>
+              </div>
+              <div v-if="filteredPresetsCount === 0" class="picker-empty">
+                <k-icon name="search"></k-icon>
+                <span>没有找到匹配的预设</span>
+              </div>
+            </div>
+          </div>
+
           <!-- 生成中状态 -->
-          <div v-if="generating" class="generating-state">
+          <div v-else-if="generating" class="generating-state">
             <div class="generating-content">
               <div class="loader"></div>
               <div class="generating-info">
@@ -211,13 +386,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, onActivated } from 'vue'
+import { ref, computed, onMounted, onUnmounted, onActivated } from 'vue'
 import { message } from '@koishijs/client'
-import { ChannelConfig, PresetData, GenerationResult, ClientFileData } from '../types'
-import { channelApi, presetApi, generateApi, taskApi } from '../api'
+import { ChannelConfig, PresetData, GenerationResult, ClientFileData, ConnectorDefinition } from '../types'
+import { channelApi, presetApi, generateApi, taskApi, connectorApi } from '../api'
+import { icons } from '../icons'
 import HistoryGallery from './HistoryGallery.vue'
 import ImageLightbox from './ImageLightbox.vue'
-import PresetPicker from './PresetPicker.vue'
 
 /** 本地文件项 */
 interface LocalFile {
@@ -226,8 +401,14 @@ interface LocalFile {
   raw: File
 }
 
+// 选择模式状态
+type PickerMode = 'channel' | 'preset' | null
+const pickerMode = ref<PickerMode>(null)
+
+// 数据
 const channels = ref<ChannelConfig[]>([])
 const presets = ref<PresetData[]>([])
+const connectors = ref<ConnectorDefinition[]>([])
 const generating = ref(false)
 const result = ref<GenerationResult | null>(null)
 const fileList = ref<LocalFile[]>([])
@@ -235,6 +416,12 @@ const uploadedFiles = ref<ClientFileData[]>([])
 const fileInput = ref<HTMLInputElement>()
 const historyGalleryRef = ref<InstanceType<typeof HistoryGallery>>()
 let fileUid = 0
+
+// 搜索和筛选
+const channelSearch = ref('')
+const channelConnectorFilter = ref('')
+const presetSearch = ref('')
+const presetSourceFilter = ref('')
 
 // 计时器相关
 const elapsedTime = ref(0)
@@ -249,6 +436,110 @@ const form = ref({
 })
 
 const presetId = ref<number | undefined>(undefined)
+
+// 计算属性：选中的渠道
+const selectedChannel = computed(() => {
+  if (!form.value.channel) return null
+  return channels.value.find(c => c.id === form.value.channel) || null
+})
+
+// 计算属性：选中的预设
+const selectedPreset = computed(() => {
+  if (!presetId.value) return null
+  return presets.value.find(p => p.id === presetId.value) || null
+})
+
+// 计算属性：筛选后的渠道
+const filteredChannels = computed(() => {
+  let filtered = channels.value
+  // 连接器筛选
+  if (channelConnectorFilter.value) {
+    filtered = filtered.filter(c => c.connectorId === channelConnectorFilter.value)
+  }
+  // 关键词搜索
+  if (channelSearch.value.trim()) {
+    const keyword = channelSearch.value.toLowerCase().trim()
+    filtered = filtered.filter(c => c.name.toLowerCase().includes(keyword))
+  }
+  return filtered
+})
+
+/** 检查预设是否匹配筛选条件 */
+const matchPresetFilter = (preset: PresetData): boolean => {
+  // 来源筛选
+  if (presetSourceFilter.value && preset.source !== presetSourceFilter.value) {
+    return false
+  }
+  // 搜索
+  if (presetSearch.value.trim()) {
+    const keyword = presetSearch.value.toLowerCase().trim()
+    if (!preset.name.toLowerCase().includes(keyword)) {
+      if (!(preset.tags || []).some(t => t.toLowerCase().includes(keyword))) {
+        return false
+      }
+    }
+  }
+  return true
+}
+
+// 计算属性：筛选后的预设数量
+const filteredPresetsCount = computed(() => {
+  return presets.value.filter(p => matchPresetFilter(p)).length
+})
+
+/** 获取连接器图标 URL */
+const getConnectorIconUrl = (connectorId: string): string => {
+  const connector = connectors.value.find(c => c.id === connectorId)
+  if (!connector?.icon) return ''
+
+  if (connector.icon === 'chatluna' || connector.icon === 'edge-tts') {
+    return new URL(`../assets/connector-icons/${connector.icon}.png`, import.meta.url).href
+  }
+  return new URL(`../assets/connector-icons/${connector.icon}.svg`, import.meta.url).href
+}
+
+/** 获取连接器名称 */
+const getConnectorName = (connectorId: string): string => {
+  const connector = connectors.value.find(c => c.id === connectorId)
+  return connector?.name || connectorId
+}
+
+/** 切换选择模式 */
+const togglePickerMode = (mode: PickerMode) => {
+  if (pickerMode.value === mode) {
+    pickerMode.value = null
+  } else {
+    pickerMode.value = mode
+    // 清空搜索
+    if (mode === 'channel') channelSearch.value = ''
+    if (mode === 'preset') {
+      presetSearch.value = ''
+      presetSourceFilter.value = ''
+    }
+  }
+}
+
+/** 选择渠道 */
+const selectChannel = (channel: ChannelConfig) => {
+  form.value.channel = channel.id
+  pickerMode.value = null
+}
+
+/** 选择预设 */
+const selectPreset = (preset: PresetData) => {
+  presetId.value = preset.id
+  pickerMode.value = null
+}
+
+/** 清除渠道选择 */
+const clearChannel = () => {
+  form.value.channel = undefined
+}
+
+/** 清除预设选择 */
+const clearPreset = () => {
+  presetId.value = undefined
+}
 
 // Lightbox 状态
 const lightboxVisible = ref(false)
@@ -318,12 +609,14 @@ const openImagePreview = (index: number) => {
 
 const fetchData = async () => {
   try {
-    const [channelsData, presetsData] = await Promise.all([
+    const [channelsData, presetsData, connectorsData] = await Promise.all([
       channelApi.listEnabled(),
-      presetApi.list(true)
+      presetApi.list(),
+      connectorApi.list()
     ])
     channels.value = channelsData
     presets.value = presetsData
+    connectors.value = connectorsData
   } catch (e) {
     console.error(e)
   }
@@ -528,13 +821,14 @@ onUnmounted(() => {
 <style scoped>
 .generate-layout {
   display: flex;
-  gap: 1rem;
+  gap: 1.25rem;
   height: 100%;
   min-height: 0;
+  padding: 0.25rem;
 }
 
 .config-panel {
-  width: 320px;
+  width: 340px;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
@@ -542,50 +836,34 @@ onUnmounted(() => {
 }
 
 .config-card {
-  padding: 1.25rem;
+  padding: 1.5rem;
   flex: 1 1 0;
   min-height: 0;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  border-radius: 12px;
-  background-color: var(--k-card-bg);
+  border-radius: 16px;
+  background: linear-gradient(180deg, var(--k-card-bg) 0%, rgba(var(--k-color-primary-rgb), 0.02) 100%);
   border: 1px solid var(--k-color-border);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-  transition: border-color 0.2s, box-shadow 0.2s;
-  /* 隐藏式滚动条 */
-  scrollbar-width: thin;
-  scrollbar-color: transparent transparent;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+  transition: border-color 0.3s, box-shadow 0.3s;
 }
 
 .config-card:hover {
-  border-color: var(--k-color-active);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
-  scrollbar-color: var(--k-color-border) transparent;
-}
-
-/* Webkit 隐藏式滚动条 */
-.config-card::-webkit-scrollbar {
-  width: 6px;
-}
-.config-card::-webkit-scrollbar-track {
-  background: transparent;
-}
-.config-card::-webkit-scrollbar-thumb {
-  background-color: transparent;
-  border-radius: 3px;
-  transition: background-color 0.2s;
-}
-.config-card:hover::-webkit-scrollbar-thumb {
-  background-color: var(--k-color-border);
+  border-color: rgba(var(--k-color-primary-rgb), 0.3);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
 }
 
 .form-section {
-  margin-bottom: 1.25rem;
+  margin-bottom: 1.5rem;
+  padding-bottom: 1.25rem;
+  border-bottom: 1px solid rgba(var(--k-color-primary-rgb), 0.08);
 }
 
 .form-section:last-of-type {
   margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: none;
 }
 
 .form-section.flex-grow {
@@ -600,24 +878,36 @@ onUnmounted(() => {
 
 .form-section.flex-grow :deep(.el-textarea__inner) {
   height: 100% !important;
+  border-radius: 10px;
+  background-color: var(--k-color-bg-2);
+  border: 1px solid var(--k-color-border);
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.form-section.flex-grow :deep(.el-textarea__inner:focus) {
+  border-color: var(--k-color-active);
+  box-shadow: 0 0 0 3px rgba(var(--k-color-primary-rgb), 0.1);
 }
 
 .section-title {
-  font-weight: 600;
-  margin-bottom: 0.5rem;
+  font-weight: 700;
+  margin-bottom: 0.75rem;
   color: var(--k-color-text);
-  font-size: 0.9rem;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
   display: flex;
   align-items: center;
-  gap: 0.4rem;
+  gap: 0.5rem;
 }
 
 .section-title .k-icon {
   color: var(--k-color-active);
+  font-size: 0.9rem;
 }
 
 .form-item {
-  margin-bottom: 0.75rem;
+  margin-bottom: 1rem;
 }
 
 .form-item:last-child {
@@ -625,39 +915,577 @@ onUnmounted(() => {
 }
 
 .label {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--k-color-text-description);
+  margin-bottom: 0.4rem;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.label .optional {
+  font-size: 0.65rem;
+  opacity: 0.6;
+  font-weight: 400;
+}
+
+/* ========== 选择触发器样式 ========== */
+.selection-trigger {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.625rem 0.875rem;
+  background: var(--k-color-bg-2);
+  border: 1px solid var(--k-color-border);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  min-height: 44px;
+  position: relative;
+  overflow: hidden;
+}
+
+.selection-trigger::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(var(--k-color-primary-rgb), 0.05) 0%, transparent 50%);
+  opacity: 0;
+  transition: opacity 0.25s;
+}
+
+.selection-trigger:hover {
+  border-color: var(--k-color-active);
+  background-color: var(--k-color-bg-1);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+}
+
+.selection-trigger:hover::before {
+  opacity: 1;
+}
+
+.selection-trigger.active {
+  border-color: var(--k-color-active);
+  box-shadow: 0 0 0 3px rgba(var(--k-color-primary-rgb), 0.12);
+}
+
+.selection-trigger.selected {
+  background: linear-gradient(135deg, rgba(var(--k-color-primary-rgb), 0.08) 0%, var(--k-card-bg) 100%);
+  border-color: var(--k-color-active);
+  border-width: 1.5px;
+}
+
+.selection-info {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  flex: 1;
+  min-width: 0;
+  position: relative;
+  z-index: 1;
+}
+
+.selection-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  object-fit: contain;
+  flex-shrink: 0;
+  background-color: var(--k-color-bg-1);
+  padding: 2px;
+}
+
+.selection-thumb {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  object-fit: cover;
+  flex-shrink: 0;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+}
+
+.selection-icon-fallback {
+  width: 28px;
+  height: 28px;
+  padding: 4px;
+  box-sizing: border-box;
+  color: var(--k-color-active);
+  background-color: rgba(var(--k-color-primary-rgb), 0.1);
+  border-radius: 6px;
+  flex-shrink: 0;
+}
+
+.selection-name {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--k-color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.placeholder-icon {
+  color: var(--k-color-text-description);
+  opacity: 0.5;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.placeholder-text {
+  flex: 1;
   font-size: 0.8rem;
   color: var(--k-color-text-description);
-  margin-bottom: 0.25rem;
+  opacity: 0.8;
+}
+
+.arrow-icon {
+  color: var(--k-color-text-description);
+  font-size: 0.75rem;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  opacity: 0.6;
+}
+
+.selection-trigger:hover .arrow-icon {
+  color: var(--k-color-active);
+  transform: translateX(3px);
+  opacity: 1;
+}
+
+.clear-btn {
+  padding: 6px;
+  color: var(--k-color-text-description);
+  cursor: pointer;
+  transition: all 0.2s;
+  flex-shrink: 0;
+  border-radius: 4px;
+  position: relative;
+  z-index: 1;
+}
+
+.clear-btn:hover {
+  color: var(--k-color-error, #f56c6c);
+  background-color: rgba(245, 108, 108, 0.1);
+}
+
+/* ========== 选择器视图样式 ========== */
+.picker-view {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.picker-header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid rgba(var(--k-color-primary-rgb), 0.1);
+  margin-bottom: 1rem;
+  flex-shrink: 0;
+}
+
+.picker-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.picker-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--k-color-text);
+  white-space: nowrap;
+}
+
+.picker-title .k-icon {
+  color: var(--k-color-active);
+  font-size: 1rem;
+}
+
+.picker-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 20px;
+  padding: 0 6px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: white;
+  background-color: var(--k-color-active);
+  border-radius: 10px;
+}
+
+.picker-close-btn {
+  flex-shrink: 0;
+}
+
+.picker-filters {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.picker-search {
+  flex: 1;
+  min-width: 0;
+}
+
+.picker-search :deep(.el-input__wrapper) {
+  border-radius: 8px;
+  background-color: var(--k-color-bg-2);
+  box-shadow: none;
+  border: 1px solid var(--k-color-border);
+  transition: all 0.2s;
+}
+
+.picker-search :deep(.el-input__wrapper:hover) {
+  border-color: var(--k-color-active);
+}
+
+.picker-search :deep(.el-input__wrapper.is-focus) {
+  border-color: var(--k-color-active);
+  box-shadow: 0 0 0 2px rgba(var(--k-color-primary-rgb), 0.1);
+}
+
+.picker-search :deep(.el-input__prefix) {
+  color: var(--k-color-text-description);
+}
+
+.picker-filter {
+  width: 120px;
+  flex-shrink: 0;
+}
+
+.picker-filter :deep(.el-select__wrapper) {
+  border-radius: 8px;
+  background-color: var(--k-color-bg-2);
+  box-shadow: none;
+  border: 1px solid var(--k-color-border);
+  min-height: 32px;
+  transition: all 0.2s;
+}
+
+.picker-filter :deep(.el-select__wrapper:hover) {
+  border-color: var(--k-color-active);
+}
+
+.picker-filter :deep(.el-select__wrapper.is-focused) {
+  border-color: var(--k-color-active);
+  box-shadow: 0 0 0 2px rgba(var(--k-color-primary-rgb), 0.1);
+}
+
+/* 渠道选择卡片网格 */
+.picker-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 0.875rem;
+  flex: 1;
+  align-content: start;
+  overflow-y: auto;
+  padding: 0.25rem;
+}
+
+.picker-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 1.125rem 0.875rem;
+  background: var(--k-card-bg);
+  border: 1px solid var(--k-color-border);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.picker-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(var(--k-color-primary-rgb), 0.05) 0%, transparent 50%);
+  opacity: 0;
+  transition: opacity 0.25s;
+  pointer-events: none;
+}
+
+.picker-card:hover {
+  background-color: var(--k-color-bg-1);
+  border-color: var(--k-color-active);
+  transform: translateY(-3px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+}
+
+.picker-card:hover::before {
+  opacity: 1;
+}
+
+.picker-card.selected {
+  border-color: var(--k-color-active);
+  border-width: 2px;
+  background: linear-gradient(135deg, rgba(var(--k-color-primary-rgb), 0.1) 0%, var(--k-card-bg) 100%);
+  box-shadow: 0 0 0 3px rgba(var(--k-color-primary-rgb), 0.1);
+}
+
+.picker-card-icon {
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--k-color-bg-2);
+  border-radius: 10px;
+  position: relative;
+  z-index: 1;
+}
+
+.picker-card-icon img {
+  width: 30px;
+  height: 28px;
+  object-fit: contain;
+}
+
+.picker-card-icon .k-icon {
+  font-size: 1.5rem;
+  color: var(--k-color-active);
+  opacity: 0.8;
+}
+
+.picker-card-name {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--k-color-text);
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+  line-height: 1.4;
+  position: relative;
+  z-index: 1;
+}
+
+.picker-card-check {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  width: 22px;
+  height: 22px;
+  background-color: var(--k-color-active);
+  border-radius: 50%;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+}
+
+.picker-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 3rem;
+  color: var(--k-color-text-description);
+}
+
+.picker-empty .k-icon {
+  font-size: 2.5rem;
+  opacity: 0.3;
+}
+
+/* ========== 预设选择器样式（复用 PresetsView 的卡片样式） ========== */
+.preset-picker-content {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 0.5rem;
+}
+
+/* 瀑布流布局覆盖 */
+.preset-picker-content .ml-masonry {
+  columns: 4;
+  column-gap: 0.75rem;
+}
+
+.preset-picker-content .ml-masonry-item {
+  break-inside: avoid;
+  margin-bottom: 0.75rem;
+}
+
+@media (max-width: 1200px) {
+  .preset-picker-content .ml-masonry { columns: 3; }
+}
+
+@media (max-width: 900px) {
+  .preset-picker-content .ml-masonry { columns: 2; }
+}
+
+/* 预设卡片 */
+.preset-picker-card {
+  background: var(--k-card-bg);
+  border: 1px solid var(--k-color-border);
+  border-radius: 8px;
+  overflow: hidden;
+  cursor: pointer;
+  position: relative;
+  transition: all 0.2s;
+}
+
+.preset-picker-card:hover {
+  border-color: var(--k-color-active);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.preset-picker-card.selected {
+  border-color: var(--k-color-active);
+  border-width: 2px;
+  box-shadow: 0 0 0 2px rgba(var(--k-color-primary-rgb), 0.2);
+}
+
+.preset-picker-card:hover .card-thumb img {
+  transform: scale(1.03);
+}
+
+/* 缩略图 */
+.preset-picker-card .card-thumb {
+  width: 100%;
+  position: relative;
+  overflow: hidden;
+  background: var(--k-color-bg-2);
+}
+
+.preset-picker-card .card-thumb img {
+  width: 100%;
+  height: auto;
+  display: block;
+  transition: transform 0.3s;
+}
+
+.preset-picker-card .card-thumb.empty {
+  aspect-ratio: 4/3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--k-color-text-description);
+  opacity: 0.4;
+  font-size: 2rem;
+}
+
+/* 底部信息 */
+.preset-picker-card .card-info {
+  padding: 0.5rem 0.625rem;
+}
+
+.preset-picker-card .card-name {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--k-color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 来源标记 */
+.preset-picker-card .card-source {
+  position: absolute;
+  top: 0.375rem;
+  left: 0.375rem;
+  font-size: 0.6rem;
+  padding: 2px 5px;
+  border-radius: 3px;
+  font-weight: 600;
+}
+
+.preset-picker-card .card-source.api {
+  background: var(--k-color-active);
+  color: white;
+}
+
+.preset-picker-card .card-source.user {
+  background: var(--k-color-warning, #e6a23c);
+  color: white;
+}
+
+/* 选中标记 */
+.preset-picker-card .card-check {
+  position: absolute;
+  top: 0.375rem;
+  right: 0.375rem;
+  width: 22px;
+  height: 22px;
+  background-color: var(--k-color-active);
+  border-radius: 50%;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
 }
 
 .form-actions {
-  margin-top: 1.25rem;
-  padding-top: 1rem;
-  border-top: 1px solid var(--k-color-border);
+  margin-top: auto;
+  padding-top: 1.25rem;
 }
 
 .generate-btn {
   width: 100%;
-  height: 40px;
+  height: 46px;
   font-size: 0.95rem;
-  font-weight: 600;
-  transition: all 0.2s;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   background: linear-gradient(135deg, var(--k-color-primary) 0%, var(--k-color-primary-dark, var(--k-color-primary)) 100%);
   border: none;
+  border-radius: 10px;
+  position: relative;
+  overflow: hidden;
+}
+
+.generate-btn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(255,255,255,0.15) 0%, transparent 50%);
+  opacity: 0;
+  transition: opacity 0.3s;
 }
 
 .generate-btn:not(:disabled):hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(var(--k-color-primary-rgb), 0.4);
-  filter: brightness(1.1);
+  box-shadow: 0 8px 24px rgba(var(--k-color-primary-rgb), 0.45);
+  filter: brightness(1.08);
+}
+
+.generate-btn:not(:disabled):hover::before {
+  opacity: 1;
+}
+
+.generate-btn:not(:disabled):active {
+  transform: translateY(0);
+  box-shadow: 0 4px 12px rgba(var(--k-color-primary-rgb), 0.3);
 }
 
 .preview-panel {
   flex: 1 1 0;
   min-height: 0;
   min-width: 0;
-  background-color: var(--k-card-bg);
-  border-radius: 12px;
+  background: linear-gradient(180deg, var(--k-card-bg) 0%, rgba(var(--k-color-primary-rgb), 0.02) 100%);
+  border-radius: 16px;
   border: 1px solid var(--k-color-border);
   display: flex;
   flex-direction: column;
@@ -666,32 +1494,13 @@ onUnmounted(() => {
   padding: 2rem;
   position: relative;
   overflow-y: auto;
-  transition: border-color 0.2s, box-shadow 0.2s;
-  /* 隐藏式滚动条 */
-  scrollbar-width: thin;
-  scrollbar-color: transparent transparent;
+  transition: border-color 0.3s, box-shadow 0.3s;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
 }
 
 .preview-panel:hover {
-  border-color: var(--k-color-active);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
-  scrollbar-color: var(--k-color-border) transparent;
-}
-
-/* Webkit 隐藏式滚动条 */
-.preview-panel::-webkit-scrollbar {
-  width: 6px;
-}
-.preview-panel::-webkit-scrollbar-track {
-  background: transparent;
-}
-.preview-panel::-webkit-scrollbar-thumb {
-  background-color: transparent;
-  border-radius: 3px;
-  transition: background-color 0.2s;
-}
-.preview-panel:hover::-webkit-scrollbar-thumb {
-  background-color: var(--k-color-border);
+  border-color: rgba(var(--k-color-primary-rgb), 0.3);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
 }
 
 /* States */
@@ -706,10 +1515,16 @@ onUnmounted(() => {
 }
 
 .empty-icon {
-  font-size: 5rem;
-  margin-bottom: 1.5rem;
-  opacity: 0.2;
+  font-size: 4.5rem;
+  margin-bottom: 1.25rem;
+  opacity: 0.15;
   color: var(--k-color-text);
+}
+
+.empty-state p {
+  font-size: 0.9rem;
+  opacity: 0.7;
+  margin: 0;
 }
 
 /* 生成中状态 - 增强样式 */
@@ -1008,24 +1823,31 @@ onUnmounted(() => {
 
 /* Upload Area */
 .upload-area {
-  margin-top: 0.25rem;
+  margin-top: 0.5rem;
 }
 
 .upload-list {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem;
-  margin-bottom: 0.5rem;
+  gap: 0.625rem;
+  margin-bottom: 0.625rem;
 }
 
 .upload-item {
   position: relative;
-  width: 56px;
-  height: 56px;
-  border-radius: 6px;
+  width: 60px;
+  height: 60px;
+  border-radius: 8px;
   overflow: hidden;
   border: 1px solid var(--k-color-border);
   background-color: var(--k-color-bg-2);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+  transition: all 0.2s;
+}
+
+.upload-item:hover {
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 .upload-thumb {
@@ -1037,14 +1859,15 @@ onUnmounted(() => {
 .upload-overlay {
   position: absolute;
   inset: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: linear-gradient(135deg, rgba(245, 108, 108, 0.85) 0%, rgba(220, 80, 80, 0.9) 100%);
   display: flex;
   align-items: center;
   justify-content: center;
   opacity: 0;
-  transition: opacity 0.2s;
+  transition: opacity 0.25s;
   cursor: pointer;
   color: white;
+  font-size: 1.1rem;
 }
 
 .upload-item:hover .upload-overlay {
@@ -1052,38 +1875,57 @@ onUnmounted(() => {
 }
 
 .upload-trigger {
-  width: 56px;
-  height: 56px;
+  width: 60px;
+  height: 60px;
   border: 2px dashed var(--k-color-border);
-  border-radius: 6px;
+  border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   background-color: var(--k-color-bg-2);
+  position: relative;
+}
+
+.upload-trigger::before {
+  content: '';
+  position: absolute;
+  inset: 4px;
+  border-radius: 4px;
+  background: rgba(var(--k-color-primary-rgb), 0.05);
+  opacity: 0;
+  transition: opacity 0.25s;
 }
 
 .upload-trigger:hover {
   border-color: var(--k-color-active);
   background-color: var(--k-color-bg-1);
+  transform: scale(1.05);
+}
+
+.upload-trigger:hover::before {
+  opacity: 1;
 }
 
 .upload-icon {
-  font-size: 1.25rem;
+  font-size: 1.35rem;
   color: var(--k-color-text-description);
-  transition: color 0.2s;
+  transition: all 0.25s;
+  position: relative;
+  z-index: 1;
 }
 
 .upload-trigger:hover .upload-icon {
   color: var(--k-color-active);
+  transform: scale(1.1);
 }
 
 .upload-tip {
   font-size: 0.7rem;
   color: var(--k-color-text-description);
-  margin-top: 0.35rem;
-  opacity: 0.8;
+  margin-top: 0.5rem;
+  opacity: 0.7;
 }
 
 /* Text output */

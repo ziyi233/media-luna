@@ -1,7 +1,7 @@
 {
   "name": "koishi-plugin-media-luna",
   "description": "ai media生成插件",
-  "version": "0.0.98",
+  "version": "0.0.107",
   "main": "lib/index.js",
   "typings": "lib/index.d.ts",
   "exports": {
@@ -56,7 +56,7 @@
   },
   "koishi": {
     "description": {
-      "zh": "中间件驱动的多媒体生成插件，支持多连接器、预设系统和 ChatLuna 工具集成"
+      "zh": "AI生成图片/音频/视频插件，拥有独立webui，支持在网页生成或指令调用，可注册vits服务和chatluna工具。"
     },
     "service": {
       "required": [

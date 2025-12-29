@@ -77,7 +77,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount, h, reactive } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, reactive } from 'vue'
 import ChannelsView from '../components/ChannelsView.vue'
 import PresetsView from '../components/PresetsView.vue'
 import TasksView from '../components/TasksView.vue'
@@ -85,6 +85,7 @@ import GenerateView from '../components/GenerateView.vue'
 import SettingsView from '../components/SettingsView.vue'
 import SetupWizard from '../components/SetupWizard.vue'
 import { setupApi, versionApi } from '../api'
+import { icons, createIcon, iconPaths } from '../icons'
 
 const currentView = ref('generate')
 const showSetupWizard = ref(false)
@@ -149,14 +150,12 @@ const activeComponent = computed(() => {
   }
 })
 
-const createIcon = (d: string) => () => h('svg', { viewBox: '0 0 24 24', fill: 'currentColor' }, [ h('path', { d }) ])
-
 const menuItems = [
-  { id: 'generate', label: '生成', icon: createIcon('M7.5 5.6L10 7 8.6 4.5 10 2 7.5 3.4 5 2 6.4 4.5 5 7zM19 2l-2.5 1.4L14 2l1.4 2.5L14 7l2.5-1.4L19 7l-1.4-2.5zm-5.6 5.4L9 12l4.4 4.6L17.8 12zM2 13l2.5 1.4L6 17l1.4-2.5L10 13 7.5 11.6 6 9l-1.4 2.5z') },
-  { id: 'channels', label: '渠道', icon: createIcon('M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z') },
-  { id: 'presets', label: '预设', icon: createIcon('M17 3H7c-1.1 0-2 .9-2 2v16l7-3 7 3V5c0-1.1-.9-2-2-2z') },
-  { id: 'tasks', label: '任务', icon: createIcon('M19 3h-4.18C14.4 1.84 13.3 1 12 1c-1.3 0-2.4.84-2.82 2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 0c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zm2 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z') },
-  { id: 'settings', label: '设置', icon: createIcon('M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.488.488 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.58 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z') },
+  { id: 'generate', label: '生成', icon: icons.generate },
+  { id: 'channels', label: '渠道', icon: icons.channels },
+  { id: 'presets', label: '预设', icon: icons.presets },
+  { id: 'tasks', label: '任务', icon: icons.tasks },
+  { id: 'settings', label: '设置', icon: icons.settings },
 ]
 
 // Logic to hide Koishi's default header

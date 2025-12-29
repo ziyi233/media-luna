@@ -27,6 +27,9 @@ import chatlunaConnectorPlugin from './connector-chatluna'
 import doubaoConnectorPlugin from './connector-doubao'
 import minimaxConnectorPlugin from './connector-minimax'
 import edgeTTSConnectorPlugin from './connector-edge-tts'
+import openaiTTSConnectorPlugin from './connector-openai-tts'
+import azureTTSConnectorPlugin from './connector-azure-tts'
+import volcengineTTSConnectorPlugin from './connector-volcengine-tts'
 import { modelscopePlugin } from './plugin-modelscope'
 
 /** 内置插件列表 - 只需在这里维护一次 */
@@ -55,6 +58,9 @@ export const builtinPlugins: PluginDefinition[] = [
   doubaoConnectorPlugin,
   minimaxConnectorPlugin,
   edgeTTSConnectorPlugin,
+  openaiTTSConnectorPlugin,
+  azureTTSConnectorPlugin,
+  volcengineTTSConnectorPlugin,
   modelscopePlugin
 ]
 
@@ -82,6 +88,9 @@ export {
   doubaoConnectorPlugin,
   minimaxConnectorPlugin,
   edgeTTSConnectorPlugin,
+  openaiTTSConnectorPlugin,
+  azureTTSConnectorPlugin,
+  volcengineTTSConnectorPlugin,
   modelscopePlugin
 }
 

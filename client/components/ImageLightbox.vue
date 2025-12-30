@@ -37,16 +37,10 @@
 
                 <!-- 音频 -->
                 <div v-else-if="currentMedia?.kind === 'audio'" class="lightbox-audio-container">
-                  <div class="audio-visual-large">
-                    <k-icon name="volume-up"></k-icon>
-                    <span v-if="getMediaDuration(currentMedia.url)" class="audio-duration-large">{{ getMediaDuration(currentMedia.url) }}</span>
-                  </div>
-                  <audio
+                  <AudioPlayer
                     :src="currentMedia.url"
-                    class="lightbox-audio"
-                    controls
-                    autoplay
-                    @loadedmetadata="handleMediaMetadata($event, currentMedia.url)"
+                    large
+                    @click.stop
                   />
                 </div>
 
@@ -157,6 +151,7 @@ import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { message } from '@koishijs/client'
 import { taskApi, userApi } from '../api'
 import type { TaskData, AssetKind } from '../types'
+import AudioPlayer from './AudioPlayer.vue'
 
 /** 媒体项 */
 interface MediaItem {
@@ -196,9 +191,6 @@ const taskData = ref<TaskData | null>(null)
 const userInfo = ref<{ name?: string; avatar?: string; platform?: string } | null>(null)
 const currentIndex = ref(props.initialIndex)
 
-// 媒体时长缓存 (key: url, value: duration in seconds)
-const mediaDurations = ref<Record<string, number>>({})
-
 // 判断是否使用 taskId 模式
 const isTaskIdMode = computed(() => !!props.taskId && !props.images?.length && !props.media?.length)
 
@@ -229,26 +221,9 @@ const sidebarTitle = computed(() => {
   return '图片详情'
 })
 
-/** 处理媒体加载元数据事件，获取时长 */
-const handleMediaMetadata = (e: Event, url: string) => {
-  const media = e.target as HTMLAudioElement | HTMLVideoElement
-  if (media.duration && isFinite(media.duration)) {
-    mediaDurations.value[url] = media.duration
-  }
-}
-
-/** 获取媒体时长显示 */
-const getMediaDuration = (url: string) => {
-  const duration = mediaDurations.value[url]
-  return duration ? formatMediaDuration(duration) : ''
-}
-
-/** 格式化媒体时长（秒 -> mm:ss） */
-const formatMediaDuration = (seconds: number) => {
-  if (!seconds || seconds <= 0) return ''
-  const mins = Math.floor(seconds / 60)
-  const secs = Math.floor(seconds % 60)
-  return mins > 0 ? `${mins}:${secs.toString().padStart(2, '0')}` : `0:${secs.toString().padStart(2, '0')}`
+/** 处理视频加载元数据事件 */
+const handleMediaMetadata = (_e: Event, _url: string) => {
+  // 视频时长处理（如需记录可在此扩展）
 }
 
 // 显示的提示词（支持两种模式）
@@ -367,15 +342,32 @@ const openOriginal = () => {
   }
 }
 
-const downloadMedia = () => {
+const downloadMedia = async () => {
   if (!currentMedia.value?.url) return
-  const link = document.createElement('a')
-  link.href = currentMedia.value.url
-  // 根据媒体类型选择扩展名
+
   const kind = currentMedia.value.kind
   const ext = kind === 'audio' ? 'mp3' : kind === 'video' ? 'mp4' : 'png'
-  link.download = `${kind}-${Date.now()}.${ext}`
-  link.click()
+  const filename = `${kind}-${Date.now()}.${ext}`
+
+  try {
+    // 通过 fetch 获取 blob 实现真正下载（绕过跨域限制）
+    const response = await fetch(currentMedia.value.url)
+    const blob = await response.blob()
+    const blobUrl = URL.createObjectURL(blob)
+
+    const link = document.createElement('a')
+    link.href = blobUrl
+    link.download = filename
+    link.click()
+
+    // 清理 blob URL
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 100)
+  } catch (e) {
+    // 如果 fetch 失败（如 CORS 问题），回退到直接打开
+    console.warn('Download failed, opening in new tab:', e)
+    window.open(currentMedia.value.url, '_blank')
+    message.warning('无法直接下载，已在新标签页打开')
+  }
 }
 
 const formatDate = (date: Date | string) => {
@@ -472,41 +464,11 @@ onUnmounted(() => {
 /* 音频容器 */
 .lightbox-audio-container {
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 32px;
   padding: 40px;
-}
-
-.audio-visual-large {
-  width: 180px;
-  height: 180px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, var(--k-color-active), var(--k-color-primary));
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  color: white;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-}
-
-.audio-visual-large .k-icon {
-  font-size: 64px;
-}
-
-.audio-duration-large {
-  font-size: 1.2rem;
-  font-weight: 600;
-  opacity: 0.9;
-}
-
-.lightbox-audio {
   width: 100%;
-  max-width: 400px;
-  height: 48px;
+  max-width: 500px;
 }
 
 .loading-state {

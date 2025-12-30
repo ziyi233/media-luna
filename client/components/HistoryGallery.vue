@@ -77,18 +77,11 @@
             </div>
             <!-- 音频 -->
             <div class="task-audio-wrapper" v-else-if="task.media[0].kind === 'audio'">
-              <div class="audio-preview">
-                <div class="audio-icon-circle">
-                  <k-icon name="volume-up"></k-icon>
-                  <span v-if="getMediaDuration(task.media[0].url)" class="audio-duration-text">{{ getMediaDuration(task.media[0].url) }}</span>
-                </div>
-              </div>
-              <audio
+              <AudioPlayer
                 :src="task.media[0].url"
-                controls
-                class="task-audio-player"
+                :duration="task.media[0].meta?.duration"
+                compact
                 @click.stop
-                @loadedmetadata="handleMediaMetadata($event, task.media[0].url)"
               />
               <div v-if="task.media.length > 1" class="more-images audio-more">
                 +{{ task.media.length - 1 }}
@@ -146,10 +139,12 @@ import { ref, onMounted, onUnmounted } from 'vue'
 import { taskApi, authApi } from '../api'
 import type { TaskData } from '../types'
 import ImageLightbox from './ImageLightbox.vue'
+import AudioPlayer from './AudioPlayer.vue'
 
 interface MediaItem {
   kind: 'image' | 'video' | 'audio'
   url: string
+  meta?: { duration?: number }
 }
 
 interface TaskItem {
@@ -184,31 +179,6 @@ const lightboxIndex = ref(0)
 const lightboxPrompt = ref('')
 const lightboxCreatedAt = ref<Date | undefined>()
 const lightboxDuration = ref<number | undefined>()
-
-// 媒体时长缓存 (key: url, value: duration in seconds)
-const mediaDurations = ref<Record<string, number>>({})
-
-/** 处理媒体加载元数据事件，获取时长 */
-const handleMediaMetadata = (e: Event, url: string) => {
-  const media = e.target as HTMLAudioElement | HTMLVideoElement
-  if (media.duration && isFinite(media.duration)) {
-    mediaDurations.value[url] = media.duration
-  }
-}
-
-/** 获取媒体时长显示 */
-const getMediaDuration = (url: string) => {
-  const duration = mediaDurations.value[url]
-  return duration ? formatMediaDuration(duration) : ''
-}
-
-/** 格式化媒体时长（秒 -> mm:ss） */
-const formatMediaDuration = (seconds: number) => {
-  if (!seconds || seconds <= 0) return ''
-  const mins = Math.floor(seconds / 60)
-  const secs = Math.floor(seconds % 60)
-  return mins > 0 ? `${mins}:${secs.toString().padStart(2, '0')}` : `0:${secs.toString().padStart(2, '0')}`
-}
 
 // 检查登录状态
 const checkAuth = async () => {
@@ -619,50 +589,6 @@ onUnmounted(() => {
 .task-audio-wrapper {
   position: relative;
   width: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 0;
-  background: linear-gradient(145deg, rgba(103, 194, 58, 0.08), rgba(64, 158, 255, 0.08));
-}
-
-.audio-preview {
-  padding: 1rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.audio-icon-circle {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, rgba(103, 194, 58, 0.2), rgba(64, 158, 255, 0.2));
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  color: var(--k-color-success, #67c23a);
-  font-size: 1.1rem;
-  transition: all 0.3s ease;
-}
-
-.audio-duration-text {
-  font-size: 0.6rem;
-  font-weight: 600;
-  margin-top: 1px;
-  color: var(--k-color-success, #67c23a);
-}
-
-.task-card:hover .audio-icon-circle {
-  transform: scale(1.1);
-  box-shadow: 0 4px 12px rgba(103, 194, 58, 0.2);
-}
-
-.task-audio-player {
-  width: 100%;
-  height: 32px;
-  border-radius: 0;
 }
 
 /* 处理中动画 */

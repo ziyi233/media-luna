@@ -304,16 +304,11 @@
                   @mouseleave="($event.target as HTMLVideoElement).pause()"
                 />
                 <div v-else-if="item.kind === 'audio'" class="gallery-audio">
-                  <div class="audio-icon-wrapper">
-                    <k-icon name="volume-up"></k-icon>
-                    <span v-if="getMediaDuration(item.url)" class="audio-duration-badge">{{ getMediaDuration(item.url) }}</span>
-                  </div>
-                  <audio
+                  <AudioPlayer
                     :src="item.url"
-                    controls
-                    class="gallery-audio-player"
+                    :duration="item.duration"
+                    compact
                     @click.stop
-                    @loadedmetadata="handleMediaMetadata($event, item.url)"
                   />
                 </div>
                 <div v-if="item.kind !== 'audio'" class="gallery-overlay">
@@ -521,6 +516,7 @@ import { TaskData, ChannelConfig } from '../types'
 import { taskApi, channelApi } from '../api'
 import StatusBadge from './StatusBadge.vue'
 import ImageLightbox from './ImageLightbox.vue'
+import AudioPlayer from './AudioPlayer.vue'
 
 // 视图模式
 const viewMode = ref<'list' | 'gallery'>('list')
@@ -542,23 +538,6 @@ const filter = ref({
   uid: '' as string,
   channelId: undefined as number | undefined
 })
-
-// 媒体时长缓存 (key: url, value: duration in seconds)
-const mediaDurations = ref<Record<string, number>>({})
-
-/** 处理媒体加载元数据事件，获取时长 */
-const handleMediaMetadata = (e: Event, url: string) => {
-  const media = e.target as HTMLAudioElement | HTMLVideoElement
-  if (media.duration && isFinite(media.duration)) {
-    mediaDurations.value[url] = media.duration
-  }
-}
-
-/** 获取媒体时长显示 */
-const getMediaDuration = (url: string) => {
-  const duration = mediaDurations.value[url]
-  return duration ? formatMediaDuration(duration) : ''
-}
 
 // 渠道列表（用于下拉筛选）
 const channels = ref<ChannelConfig[]>([])
@@ -1306,52 +1285,7 @@ onMounted(() => {
 
 /* Gallery Audio Card */
 .gallery-audio {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 1.5rem 1rem;
-  min-height: 120px;
-  background: linear-gradient(145deg, rgba(103, 194, 58, 0.08), rgba(64, 158, 255, 0.08));
-}
-
-.audio-icon-wrapper {
-  width: 48px;
-  height: 48px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, rgba(103, 194, 58, 0.2), rgba(64, 158, 255, 0.2));
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 0.75rem;
-  color: var(--k-color-success, #67c23a);
-  font-size: 1.25rem;
-  transition: all 0.3s ease;
-  position: relative;
-}
-
-.audio-duration-badge {
-  font-size: 0.65rem;
-  font-weight: 600;
-  margin-top: 2px;
-  color: var(--k-color-success, #67c23a);
-}
-
-.gallery-item:hover .audio-icon-wrapper {
-  transform: scale(1.1);
-  box-shadow: 0 4px 12px rgba(103, 194, 58, 0.2);
-}
-
-.gallery-audio-player {
   width: 100%;
-  height: 32px;
-  border-radius: 16px;
-}
-
-/* Custom audio player styling */
-.gallery-audio-player::-webkit-media-controls-panel {
-  background: var(--k-color-bg-2);
 }
 
 .gallery-overlay {

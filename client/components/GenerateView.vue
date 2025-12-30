@@ -298,20 +298,14 @@
                   </template>
                   <!-- 音频 -->
                   <template v-else-if="asset.kind === 'audio'">
-                    <div class="audio-card">
-                      <div class="audio-visual">
-                        <div class="audio-icon-large">
-                          <k-icon name="volume-up"></k-icon>
-                          <span v-if="asset.url && getMediaDuration(asset.url)" class="audio-duration-large">{{ getMediaDuration(asset.url!) }}</span>
-                        </div>
-                      </div>
-                      <audio
-                        :src="asset.url"
-                        controls
-                        class="output-audio"
-                        @loadedmetadata="asset.url && handleMediaMetadata($event, asset.url)"
+                    <div class="audio-wrapper">
+                      <AudioPlayer
+                        :ref="el => setAudioRef(el, idx)"
+                        :src="asset.url!"
+                        :duration="asset.meta?.duration"
+                        @play-state-change="onAudioPlayStateChange(idx, $event)"
                       />
-                      <div class="output-actions">
+                      <div class="output-actions audio-actions">
                         <a :href="asset.url" target="_blank" class="action-btn" download>
                           <k-icon name="download"></k-icon>
                         </a>
@@ -393,6 +387,7 @@ import { channelApi, presetApi, generateApi, taskApi, connectorApi } from '../ap
 import { icons } from '../icons'
 import HistoryGallery from './HistoryGallery.vue'
 import ImageLightbox from './ImageLightbox.vue'
+import AudioPlayer from './AudioPlayer.vue'
 
 /** 本地文件项 */
 interface LocalFile {
@@ -579,6 +574,26 @@ const formatMediaDuration = (seconds: number) => {
   const mins = Math.floor(seconds / 60)
   const secs = Math.floor(seconds % 60)
   return mins > 0 ? `${mins}:${secs.toString().padStart(2, '0')}` : `0:${secs.toString().padStart(2, '0')}`
+}
+
+// ========== 音频播放控制 ==========
+const audioPlayerRefs = ref<Record<number, InstanceType<typeof AudioPlayer> | null>>({})
+
+/** 设置音频播放器引用 */
+const setAudioRef = (el: any, idx: number) => {
+  audioPlayerRefs.value[idx] = el
+}
+
+/** 音频播放状态改变 - 暂停其他播放器 */
+const onAudioPlayStateChange = (idx: number, playing: boolean) => {
+  if (playing) {
+    // 暂停其他音频
+    Object.entries(audioPlayerRefs.value).forEach(([key, player]) => {
+      if (Number(key) !== idx && player) {
+        player.pause()
+      }
+    })
+  }
 }
 
 // 开始计时
@@ -1597,20 +1612,22 @@ onUnmounted(() => {
   height: 100%;
   display: flex;
   flex-direction: column;
+  justify-content: center;
 }
 
 .success-result {
-  flex-grow: 1;
   display: flex;
   flex-direction: column;
+  align-items: center;
+  max-height: 100%;
 }
 
 .output-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  display: flex;
+  flex-wrap: wrap;
   gap: 1.5rem;
-  flex-grow: 1;
-  align-content: start;
+  justify-content: center;
+  align-items: center;
 }
 
 .output-wrapper {
@@ -1646,67 +1663,32 @@ onUnmounted(() => {
   display: block;
 }
 
-/* Audio Card */
-.audio-card {
+/* 音频包装器样式 */
+.audio-wrapper {
   position: relative;
-  display: flex;
-  flex-direction: column;
-  width: 100%;
+  min-width: 280px;
+  max-width: 400px;
 }
 
-.audio-visual {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 2rem;
-  background: linear-gradient(145deg, rgba(103, 194, 58, 0.1), rgba(64, 158, 255, 0.1));
-}
-
-.audio-icon-large {
-  width: 64px;
-  height: 64px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, rgba(103, 194, 58, 0.25), rgba(64, 158, 255, 0.25));
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  color: var(--k-color-success, #67c23a);
-  font-size: 1.75rem;
-  transition: all 0.3s ease;
-  box-shadow: 0 4px 16px rgba(103, 194, 58, 0.15);
-}
-
-.audio-duration-large {
-  font-size: 0.75rem;
-  font-weight: 600;
-  margin-top: 2px;
-  color: var(--k-color-success, #67c23a);
-}
-
-.output-wrapper:hover .audio-icon-large {
-  transform: scale(1.1);
-  box-shadow: 0 6px 24px rgba(103, 194, 58, 0.25);
-}
-
-.output-audio {
-  width: 100%;
-  height: 40px;
-  background: var(--k-color-bg-2);
-}
-
-.audio-card .output-actions {
+.audio-wrapper:hover .audio-actions {
   opacity: 1;
-  background: transparent;
+  pointer-events: auto;
+}
+
+.output-actions.audio-actions {
+  opacity: 0;
   position: absolute;
   top: 8px;
   right: 8px;
   bottom: auto;
   left: auto;
   padding: 0;
+  background: transparent;
+  transition: opacity 0.2s;
+  pointer-events: none;
 }
 
-.audio-card .action-btn {
+.output-actions.audio-actions .action-btn {
   width: 32px;
   height: 32px;
   border-radius: 50%;
@@ -1717,9 +1699,20 @@ onUnmounted(() => {
   transition: all 0.2s;
 }
 
-.audio-card .action-btn:hover {
+.output-actions.audio-actions .action-btn:hover {
   background: rgba(0, 0, 0, 0.7);
   transform: scale(1.1);
+}
+
+.output-wrapper:has(.audio-wrapper) {
+  border: none;
+  box-shadow: none;
+  background: transparent;
+}
+
+.output-wrapper:has(.audio-wrapper):hover {
+  transform: none;
+  box-shadow: none;
 }
 
 .output-actions {
@@ -1733,10 +1726,12 @@ onUnmounted(() => {
   justify-content: flex-end;
   opacity: 0;
   transition: opacity 0.2s;
+  pointer-events: none;
 }
 
 .output-wrapper:hover .output-actions {
   opacity: 1;
+  pointer-events: auto;
 }
 
 .action-btn {

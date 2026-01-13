@@ -14,5 +14,6 @@ export default (ctx: Context) => {
     icon: 'luna-crescent',
     component: Index,
     order: 500,
+    authority: 3
   })
 }

@@ -87,7 +87,7 @@ export interface MediaLunaAssetCache {
   sourceUrl: string           // 原始 URL（对于 base64 存储为 'base64://...'）
   sourceHash: string          // 源标识的 hash
   contentHash: string         // 文件内容的 SHA256 hash（用于去重）
-  backend: 'koishi' | 'local' | 's3' | 'webdav'
+  backend: 'koishi' | 'local' | 's3' | 'webdav' | 'oss'
   cachedUrl: string           // 缓存后的访问 URL
   cachedKey: string           // 存储路径/key
   mimeType: string            // MIME 类型

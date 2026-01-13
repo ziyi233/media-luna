@@ -58,6 +58,7 @@
       title="验证存储配置"
       width="500px"
       :close-on-click-modal="false"
+      :teleported="false"
       class="upload-verify-dialog"
     >
       <div class="upload-verify-content">

@@ -296,7 +296,7 @@
     </div>
 
     <!-- 编辑对话框 -->
-    <Teleport to="body">
+    <Teleport to="#ml-teleport-container" defer>
       <div v-if="dialogVisible" class="modal-overlay" @click.self="dialogVisible = false">
         <div class="modal-dialog pop-card no-hover">
           <div class="modal-header">

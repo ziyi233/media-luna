@@ -128,6 +128,7 @@
                 :model-value="row[col.key]"
                 @update:model-value="updateCell(index, col.key, $event)"
                 :placeholder="col.placeholder || '请选择'"
+                :teleported="false"
                 size="small"
               >
                 <el-option
@@ -161,6 +162,7 @@
       title="导入数据"
       width="550px"
       :close-on-click-modal="false"
+      :teleported="false"
     >
       <p class="dialog-tip">粘贴 JSON 数组格式数据：</p>
       <el-input
@@ -187,6 +189,7 @@
       title="内置预设"
       width="600px"
       :close-on-click-modal="false"
+      :teleported="false"
     >
       <div class="presets-header">
         <el-input

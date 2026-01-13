@@ -49,6 +49,7 @@
               @update:model-value="setFieldValue(field.key, $event)"
               :placeholder="getFieldPlaceholder(field)"
               clearable
+              :teleported="false"
               style="width: 100%"
             >
               <el-option label="是" :value="true" />
@@ -69,6 +70,7 @@
               @update:model-value="setFieldValue(field.key, $event)"
               :placeholder="getFieldPlaceholder(field) || '请选择'"
               :clearable="clearable || overrideMode"
+              :teleported="false"
               style="width: 100%"
             >
               <el-option
@@ -89,6 +91,7 @@
               :clearable="clearable || overrideMode"
               :loading="isRemoteLoading(field)"
               filterable
+              :teleported="false"
               style="width: 100%"
             >
               <el-option
@@ -116,6 +119,7 @@
                 placeholder="从预设中选择"
                 :clearable="false"
                 filterable
+                :teleported="false"
                 style="width: 100%; margin-top: 4px;"
                 class="combobox-presets"
               >

@@ -1,6 +1,6 @@
 <template>
   <div class="sort-select">
-    <el-dropdown trigger="click" @command="handleCommand">
+    <el-dropdown trigger="click" :teleported="false" @command="handleCommand">
       <span class="sort-trigger">
         <k-icon name="sort"></k-icon>
         <span class="trigger-text">{{ currentLabel }}</span>

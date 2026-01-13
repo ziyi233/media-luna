@@ -7,6 +7,7 @@
       allow-create
       default-first-option
       :placeholder="placeholder"
+      :teleported="false"
       class="tag-select"
       tag-type="primary"
     >

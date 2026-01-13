@@ -4,9 +4,10 @@
     :title="dialogTitle"
     width="500px"
     :close-on-click-modal="false"
+    :teleported="false"
     @close="handleClose"
   >
-    <div class="upload-form" v-loading="uploading">
+    <div class="upload-form">
       <!-- 预览图 -->
       <div class="preview-section" v-if="previewUrl">
         <img :src="previewUrl" class="preview-image" />
@@ -63,6 +64,7 @@
           filterable
           allow-create
           default-first-option
+          :teleported="false"
           placeholder="输入标签后回车添加"
           style="width: 100%"
         >
@@ -85,7 +87,7 @@
     <template #footer>
       <span class="dialog-footer">
         <el-button @click="handleClose">取消</el-button>
-        <el-button type="primary" @click="handleUpload" :loading="uploading" :disabled="!canUpload">
+        <el-button type="primary" @click="handleUpload" :disabled="!canUpload">
           上传
         </el-button>
       </span>
@@ -131,7 +133,6 @@ const visible = computed({
   set: (val) => emit('update:modelValue', val)
 })
 
-const uploading = ref(false)
 const uploadConfig = ref<{ uploadUrl: string, defaultAuthor: string, enabled: boolean } | null>(null)
 
 const form = ref({
@@ -201,46 +202,50 @@ function initForm() {
   }
 }
 
-// 上传
+// 上传（非阻塞式，提交后立即关闭对话框）
 async function handleUpload() {
   if (!canUpload.value) return
 
-  uploading.value = true
+  // 收集上传数据
+  const uploadData = {
+    title: form.value.title.trim(),
+    category: form.value.category,
+    author: form.value.author.trim() || undefined,
+    description: form.value.description.trim() || undefined,
+    tags: form.value.tags.length > 0 ? form.value.tags : undefined
+  }
+
+  // 立即关闭对话框，不阻塞用户操作
+  handleClose()
+  emit('success')
+
+  // 显示提交中提示
+  message.info(`正在上传「${uploadData.title}」...`)
+
+  // 后台异步执行上传
   try {
     if (props.mode === 'preset' && props.presetData) {
       const hasRefImages = props.presetData.referenceImages && props.presetData.referenceImages.length > 0
       await presetApi.upload({
-        title: form.value.title.trim(),
+        ...uploadData,
         prompt: props.presetData.promptTemplate,
         imageUrl: props.presetData.thumbnail,
-        category: form.value.category,
         type: hasRefImages ? 'img2img' : 'txt2img',
-        author: form.value.author.trim() || undefined,
-        description: form.value.description.trim() || undefined,
-        tags: form.value.tags.length > 0 ? form.value.tags : undefined,
         referenceImages: hasRefImages
           ? props.presetData.referenceImages!.map(url => ({ url }))
           : undefined
       })
     } else if (props.mode === 'task' && props.taskData) {
       await presetApi.uploadTask({
+        ...uploadData,
         taskId: props.taskData.taskId,
-        assetIndex: props.taskData.assetIndex,
-        title: form.value.title.trim(),
-        category: form.value.category,
-        author: form.value.author.trim() || undefined,
-        description: form.value.description.trim() || undefined,
-        tags: form.value.tags.length > 0 ? form.value.tags : undefined
+        assetIndex: props.taskData.assetIndex
       })
     }
 
-    message.success('上传成功')
-    emit('success')
-    handleClose()
+    message.success(`「${uploadData.title}」上传成功`)
   } catch (e: any) {
-    message.error(e.message || '上传失败')
-  } finally {
-    uploading.value = false
+    message.error(`「${uploadData.title}」上传失败: ${e.message || '未知错误'}`)
   }
 }
 

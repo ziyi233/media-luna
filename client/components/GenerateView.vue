@@ -115,11 +115,17 @@
 
         <div class="form-actions">
           <button
+            class="pop-btn secondary clear-btn"
+            @click="clearForm"
+            title="清除除渠道外的所有数据"
+          >
+            🗑️ 清空
+          </button>
+          <button
             class="pop-btn primary generate-btn"
-            :disabled="generating"
             @click="generate"
           >
-            <span v-if="generating" class="btn-loading"></span>
+            <span v-if="pendingCount > 0" class="pending-badge">{{ pendingCount }}</span>
             <span v-else>✨</span>
             开始生成
           </button>
@@ -254,11 +260,14 @@
       </div>
 
       <!-- 生成中状态 -->
-      <div v-else-if="generating" class="generating-state">
+      <div v-else-if="pendingCount > 0" class="generating-state">
         <div class="generating-content pop-card">
           <div class="loader"></div>
           <div class="generating-info">
-            <p class="generating-title">正在生成中...</p>
+            <p class="generating-title">
+              正在生成中...
+              <span v-if="pendingCount > 1" class="task-count">({{ pendingCount }} 个任务)</span>
+            </p>
             <p class="generating-timer">
               ⏱️ 已用时间: {{ formatElapsedTime(elapsedTime) }}
             </p>
@@ -380,7 +389,7 @@ import AudioPlayer from './AudioPlayer.vue'
 interface LocalFile {
   uid: number
   url: string
-  raw: File
+  raw: File | null  // null 表示从 URL 加载的图片
 }
 
 // 选择模式状态
@@ -391,7 +400,7 @@ const pickerMode = ref<PickerMode>(null)
 const channels = ref<ChannelConfig[]>([])
 const presets = ref<PresetData[]>([])
 const connectors = ref<ConnectorDefinition[]>([])
-const generating = ref(false)
+const pendingCount = ref(0)  // 进行中的任务数量
 const result = ref<GenerationResult | null>(null)
 const fileList = ref<LocalFile[]>([])
 const uploadedFiles = ref<ClientFileData[]>([])
@@ -687,9 +696,16 @@ const addFiles = async (files: File[]) => {
 const removeFile = (index: number) => {
   const file = fileList.value[index]
   if (file) {
-    URL.revokeObjectURL(file.url)
+    // 只有本地文件才需要 revoke
+    if (file.raw) {
+      URL.revokeObjectURL(file.url)
+    }
     fileList.value.splice(index, 1)
-    uploadedFiles.value.splice(index, 1)
+    // uploadedFiles 可能因为异步加载导致索引不一致，需要同步清空并重建
+    // 简单处理：直接按索引删除（假设同步）
+    if (uploadedFiles.value.length > index) {
+      uploadedFiles.value.splice(index, 1)
+    }
   }
 }
 
@@ -726,10 +742,15 @@ const generate = async () => {
     return
   }
 
-  generating.value = true
-  result.value = null
-  currentTaskId.value = null
-  startTimer()
+  // 增加进行中任务计数
+  pendingCount.value++
+
+  // 只在第一个任务时清空结果和启动计时器
+  if (pendingCount.value === 1) {
+    result.value = null
+    currentTaskId.value = null
+    startTimer()
+  }
 
   try {
     const params: any = {
@@ -750,7 +771,15 @@ const generate = async () => {
       }
     }
 
+    // 提交任务后立即刷新历史列表（延迟一点确保任务已入库）
+    setTimeout(() => {
+      historyGalleryRef.value?.refresh()
+    }, 300)
+
     const res = await generateApi.generate(params)
+
+    // 任务完成后再次刷新历史列表
+    historyGalleryRef.value?.refresh()
 
     // 更新 taskId
     if (res.taskId) {
@@ -760,7 +789,6 @@ const generate = async () => {
     // 如果成功，直接使用结果
     if (res.success) {
       result.value = res
-      historyGalleryRef.value?.refresh()
     } else {
       // API 返回失败，但可能任务实际成功了，尝试通过 taskId 获取
       if (res.taskId) {
@@ -769,7 +797,6 @@ const generate = async () => {
         const taskResult = await fetchTaskResult(res.taskId)
         if (taskResult && taskResult.success) {
           result.value = taskResult
-          historyGalleryRef.value?.refresh()
         } else {
           result.value = res
         }
@@ -781,16 +808,95 @@ const generate = async () => {
     // 请求异常（现已使用 10 分钟超时，基本不会触发）
     result.value = { success: false, error: e.message || '请求失败' }
   } finally {
-    stopTimer()
-    generating.value = false
+    // 减少进行中任务计数
+    pendingCount.value--
+    // 所有任务完成后停止计时器
+    if (pendingCount.value === 0) {
+      stopTimer()
+    }
   }
 }
 
-// 处理历史记录选择（点击历史任务时填充提示词）
-const handleHistorySelect = (task: { prompt: string }) => {
+// 处理历史记录选择（点击历史任务时填充配置）
+const handleHistorySelect = async (task: { id: number; prompt: string }) => {
+  // 先填充基本提示词
   if (task.prompt) {
     form.value.prompt = task.prompt
   }
+
+  // 获取完整任务数据以填充预设和参考图
+  try {
+    const fullTask = await taskApi.get(task.id)
+    if (!fullTask) return
+
+    // 填充预设（从 middlewareLogs 中获取）
+    const logs = fullTask.middlewareLogs as any
+    const presetLog = logs?.preset
+    if (presetLog?.presetId) {
+      // 尝试找到对应的预设
+      const preset = presets.value.find(p => p.id === presetLog.presetId || p.name === presetLog.presetName)
+      if (preset) {
+        presetId.value = preset.id
+      }
+    } else {
+      // 没有预设则清除
+      presetId.value = undefined
+    }
+
+    // 填充参考图（从 storage-input 中获取）
+    const storageInput = logs?.['storage-input']
+    if (storageInput?.logs?.length > 0) {
+      // 清除现有文件
+      fileList.value.forEach(f => {
+        if (f.raw) URL.revokeObjectURL(f.url)
+      })
+      fileList.value = []
+      uploadedFiles.value = []
+
+      // 加载历史参考图 - 直接使用 URL，后端会处理下载
+      for (const log of storageInput.logs) {
+        if (log.url) {
+          // 添加到显示列表
+          fileList.value.push({
+            uid: ++fileUid,
+            url: log.url,
+            raw: null // URL 模式，无原始文件
+          })
+
+          // 直接添加 URL 到提交列表，后端会下载处理
+          uploadedFiles.value.push({
+            type: 'image',
+            url: log.url,
+            filename: log.filename || 'reference.png'
+          })
+        }
+      }
+    } else {
+      // 没有参考图则清除
+      fileList.value.forEach(f => {
+        if (f.raw) URL.revokeObjectURL(f.url)
+      })
+      fileList.value = []
+      uploadedFiles.value = []
+    }
+  } catch (e) {
+    console.error('Failed to fetch task details:', e)
+  }
+}
+
+// 清空表单（除渠道外）
+const clearForm = () => {
+  form.value.prompt = ''
+  form.value.parameters = {}
+  presetId.value = undefined
+  // 清除文件
+  fileList.value.forEach(f => {
+    if (f.raw) URL.revokeObjectURL(f.url)
+  })
+  fileList.value = []
+  uploadedFiles.value = []
+  // 清除结果
+  result.value = null
 }
 
 onMounted(() => {
@@ -815,9 +921,10 @@ onUnmounted(() => {
 .generate-layout {
   display: flex;
   gap: 1.25rem;
-  height: 100%;
+  height: calc(100% - 12px);
   min-height: 0;
   padding: 0.25rem;
+  padding-bottom: 0;
   overflow: hidden; /* 页面不滚动 */
 }
 
@@ -1354,12 +1461,41 @@ onUnmounted(() => {
 .form-actions {
   margin-top: auto;
   padding-top: 1.25rem;
+  display: flex;
+  gap: 0.75rem;
+}
+
+.form-actions .clear-btn {
+  flex-shrink: 0;
+  height: 50px;
+  padding: 0 1rem;
 }
 
 .generate-btn {
-  width: 100%;
+  flex: 1;
   height: 50px;
   font-size: 1rem;
+}
+
+.pending-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  background: var(--ml-surface);
+  border: 2px solid var(--ml-border-color);
+  border-radius: 10px;
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: var(--ml-text);
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
 }
 
 .btn-loading {
@@ -1480,6 +1616,13 @@ onUnmounted(() => {
   font-weight: 800;
   color: var(--ml-text);
   margin: 0 0 0.75rem 0;
+}
+
+.generating-title .task-count {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--ml-text-muted);
+  margin-left: 0.5rem;
 }
 
 .generating-timer {

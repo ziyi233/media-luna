@@ -1,4 +1,4 @@
-// 统一存储服务 - 支持本地/S3/WebDAV 多后端
+// 统一存储服务 - 支持本地/S3/WebDAV/OSS 多后端
 // 根据配置的 backend 自动选择存储方式
 
 import { Context } from 'koishi'
@@ -12,6 +12,7 @@ import { getAllSchemes, schemeToStorageConfig } from './config'
 import type { MediaLunaAssetCache } from '../../augmentations'
 import { uploadToS3, deleteFromS3, type S3Config } from './utils/s3'
 import { uploadToWebDav, type WebDavConfig } from './utils/webdav'
+import { uploadToOSS, deleteFromOSS, type OSSConfig } from './utils/oss'
 import { getExtensionFromMime } from './utils/mime'
 
 /** 缓存文件元数据 */
@@ -220,6 +221,21 @@ export class CacheService {
     }
   }
 
+  /** 转换为阿里云 OSS 配置 */
+  private toOSSConfig(config?: CachePluginConfig): OSSConfig {
+    const cfg = config || this.config
+    return {
+      endpoint: cfg.ossEndpoint,
+      region: cfg.ossRegion,
+      accessKeyId: cfg.ossAccessKeyId,
+      accessKeySecret: cfg.ossAccessKeySecret,
+      bucket: cfg.ossBucket,
+      publicBaseUrl: cfg.ossPublicBaseUrl,
+      cname: cfg.ossCname,
+      acl: cfg.ossAcl
+    }
+  }
+
   /**
    * 缓存文件
    * 根据配置的后端自动选择存储方式
@@ -276,6 +292,9 @@ export class CacheService {
         break
       case 'webdav':
         cachedUrl = await this.storeWebDav(buffer, storageKey, mime, effectiveConfig)
+        break
+      case 'oss':
+        cachedUrl = await this.storeOSS(buffer, storageKey, mime, effectiveConfig)
         break
       case 'none':
         throw new Error('Storage backend is set to none')
@@ -355,6 +374,18 @@ export class CacheService {
     if (!webdavConfig.username || !webdavConfig.password) throw new Error('WebDAV 需提供用户名和密码')
 
     const result = await uploadToWebDav(buffer, storageKey, mime, webdavConfig)
+    return result.url
+  }
+
+  /** 存储到阿里云 OSS */
+  private async storeOSS(buffer: Buffer, storageKey: string, mime: string, config?: CachePluginConfig): Promise<string> {
+    const ossConfig = this.toOSSConfig(config)
+
+    if (!ossConfig.bucket) throw new Error('OSS 缺少 bucket 配置')
+    if (!ossConfig.accessKeyId || !ossConfig.accessKeySecret) throw new Error('OSS 需提供 AccessKey ID 和 Secret')
+    if (!ossConfig.endpoint) throw new Error('OSS 缺少端点配置')
+
+    const result = await uploadToOSS(buffer, storageKey, mime, ossConfig)
     return result.url
   }
 
@@ -491,6 +522,13 @@ export class CacheService {
           await this.deleteFromWebDav(key)
         } catch (e) {
           this.logger.warn('Failed to delete from WebDAV: %s', e)
+        }
+        break
+      case 'oss':
+        try {
+          await deleteFromOSS(key, this.toOSSConfig())
+        } catch (e) {
+          this.logger.warn('Failed to delete from OSS: %s', e)
         }
         break
     }

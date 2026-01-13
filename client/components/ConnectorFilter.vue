@@ -1,6 +1,6 @@
 <template>
   <div class="connector-filter">
-    <el-dropdown trigger="click" :hide-on-click="false" @visible-change="onDropdownVisibleChange">
+    <el-dropdown trigger="click" :hide-on-click="false" :teleported="false" @visible-change="onDropdownVisibleChange">
       <span class="filter-trigger" :class="{ active: selectedConnectors.length > 0 }">
         <k-icon name="link"></k-icon>
         <span class="trigger-text">连接器</span>

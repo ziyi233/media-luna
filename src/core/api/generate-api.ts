@@ -7,6 +7,46 @@ import { getUidFromAuth } from './api-utils'
 const logger = new Logger('media-luna/api')
 
 /**
+ * 从 URL 下载文件并转换为 FileData
+ */
+async function fetchFileFromUrl(url: string, filename?: string): Promise<FileData | null> {
+  try {
+    const response = await fetch(url)
+    if (!response.ok) {
+      logger.warn(`Failed to fetch file from URL: ${url}, status: ${response.status}`)
+      return null
+    }
+
+    const contentType = response.headers.get('content-type') || 'application/octet-stream'
+    const arrayBuffer = await response.arrayBuffer()
+
+    // 从 URL 或 content-disposition 推断文件名
+    let resolvedFilename = filename
+    if (!resolvedFilename) {
+      const disposition = response.headers.get('content-disposition')
+      if (disposition) {
+        const match = disposition.match(/filename[*]?=['"]?(?:UTF-\d['"]*)?([^;\r\n"']*)['"]?/i)
+        if (match) resolvedFilename = match[1]
+      }
+      if (!resolvedFilename) {
+        // 从 URL 路径提取
+        const urlPath = new URL(url).pathname
+        resolvedFilename = urlPath.split('/').pop() || 'file'
+      }
+    }
+
+    return {
+      data: arrayBuffer,
+      mime: contentType,
+      filename: resolvedFilename
+    }
+  } catch (error) {
+    logger.error(`Error fetching file from URL: ${url}`, error)
+    return null
+  }
+}
+
+/**
  * 注册生成 API
  */
 export function registerGenerateApi(ctx: Context): void {
@@ -34,21 +74,30 @@ export function registerGenerateApi(ctx: Context): void {
       uid: uid ?? null
     }))
 
-    // 转换前端传入的文件数据
-    const files: FileData[] = (request.files || []).map(file => {
+    // 转换前端传入的文件数据（支持 base64 和 URL 两种格式）
+    const filePromises = (request.files || []).map(async (file): Promise<FileData | null> => {
       // 如果已经是 ArrayBuffer (通常不会，除非通过 socket.io 二进制传输)，直接返回
       if (file.data && file.mime) return file as FileData
 
       // 处理前端传来的 ClientFileData (base64)
       if (file.base64 && file.mimeType) {
+        const buffer = Buffer.from(file.base64, 'base64')
         return {
-          data: Buffer.from(file.base64, 'base64'),
+          data: buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength),
           mime: file.mimeType,
           filename: file.filename || 'unknown'
         }
       }
+
+      // 处理 URL 类型的文件（从历史任务加载的参考图）
+      if (file.url) {
+        return await fetchFileFromUrl(file.url, file.filename)
+      }
+
       return null
-    }).filter(f => f !== null) as FileData[]
+    })
+
+    const files: FileData[] = (await Promise.all(filePromises)).filter((f): f is FileData => f !== null)
 
     try {
       if (!request.channelId && !request.channelName) {

@@ -107,6 +107,9 @@
         </div>
       </main>
     </template>
+
+    <!-- Teleport 容器：用于 Lightbox、Dialog 等组件（放在最外层确保始终存在） -->
+    <div id="ml-teleport-container"></div>
   </div>
 </template>
 
@@ -128,7 +131,8 @@ const showVersionTooltip = ref(false)
 const themes = [
   { id: 'nailong', icon: '☀️', label: '奶龙' },
   { id: 'sakura', icon: '🌸', label: '樱花' },
-  { id: 'matcha', icon: '🍵', label: '抹茶' }
+  { id: 'matcha', icon: '🍵', label: '抹茶' },
+  { id: 'manga', icon: '✒️', label: '水墨' }
 ]
 
 const currentThemeIndex = ref(0)
@@ -251,7 +255,9 @@ onMounted(() => {
   checkSetupStatus()
   checkVersion()
 })
-onBeforeUnmount(restoreHeader)
+onBeforeUnmount(() => {
+  restoreHeader()
+})
 </script>
 
 <style lang="scss">

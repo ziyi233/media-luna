@@ -230,7 +230,9 @@ export default definePlugin({
           }
 
           const templateLength = preset.promptTemplate?.length || 0
-          const useForward = templateLength > 200
+          const hasRefImages = preset.referenceImages && preset.referenceImages.length > 0
+          // 有参考图或模板较长时使用转发消息
+          const useForward = templateLength > 200 || hasRefImages
 
           if (useForward) {
             const forwardMessages: string[] = []
@@ -242,18 +244,28 @@ export default definePlugin({
             if (preset.tags && preset.tags.length > 0) {
               basicLines.push(`🏷️ 标签: ${preset.tags.join(', ')}`)
             }
-            if (preset.referenceImages && preset.referenceImages.length > 0) {
+            if (hasRefImages) {
               basicLines.push(`🖼️ 参考图: ${preset.referenceImages.length} 张`)
             }
             basicLines.push('━━━━━━━━━━━━━━')
             forwardMessages.push(`<message>${basicLines.join('\n')}</message>`)
 
+            // 预览图
             if (preset.thumbnail) {
-              forwardMessages.push(`<message><image url="${preset.thumbnail}"/></message>`)
+              forwardMessages.push(`<message>📷 预览图：\n<image url="${preset.thumbnail}"/></message>`)
             }
 
+            // 参考图（每张单独一条消息，避免消息过长）
+            if (hasRefImages) {
+              for (let i = 0; i < preset.referenceImages.length; i++) {
+                const refImg = preset.referenceImages[i]
+                forwardMessages.push(`<message>🖼️ 参考图 ${i + 1}：\n<image url="${refImg}"/></message>`)
+              }
+            }
+
+            // Prompt 模板
             if (preset.promptTemplate) {
-              forwardMessages.push(`<message>📝 Prompt 模板:\n${preset.promptTemplate}</message>`)
+              forwardMessages.push(`<message>📝 Prompt 模板：\n${preset.promptTemplate}</message>`)
             }
 
             return `<message forward>${forwardMessages.join('')}</message>`
@@ -275,10 +287,6 @@ export default definePlugin({
 
             if (preset.promptTemplate) {
               lines.push(`📝 模板: ${preset.promptTemplate}`)
-            }
-
-            if (preset.referenceImages && preset.referenceImages.length > 0) {
-              lines.push(`🖼️ 参考图: ${preset.referenceImages.length} 张`)
             }
 
             lines.push('━━━━━━━━━━━━━━')

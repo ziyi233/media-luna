@@ -5,7 +5,7 @@ import type { ConfigField } from '../../core'
 // ============ 存储方案配置 ============
 
 /** 存储后端类型 */
-export type StorageBackendType = 'local' | 's3' | 'webdav' | 'none'
+export type StorageBackendType = 'local' | 's3' | 'webdav' | 'oss' | 'none'
 
 /** 单个存储方案配置（用于额外方案） */
 export interface StorageScheme {
@@ -38,6 +38,16 @@ export interface StorageScheme {
   webdavPassword?: string
   webdavBasePath?: string
   webdavPublicBaseUrl?: string
+
+  // 阿里云 OSS 配置
+  ossEndpoint?: string
+  ossRegion?: string
+  ossAccessKeyId?: string
+  ossAccessKeySecret?: string
+  ossBucket?: string
+  ossPublicBaseUrl?: string
+  ossCname?: boolean
+  ossAcl?: 'private' | 'public-read' | 'public-read-write'
 }
 
 // ============ 插件配置（兼容旧格式 + 多方案支持） ============
@@ -71,6 +81,15 @@ export interface StorageConfig {
   webdavPassword?: string
   webdavBasePath?: string
   webdavPublicBaseUrl?: string
+  // 阿里云 OSS 配置
+  ossEndpoint?: string
+  ossRegion?: string
+  ossAccessKeyId?: string
+  ossAccessKeySecret?: string
+  ossBucket?: string
+  ossPublicBaseUrl?: string
+  ossCname?: boolean
+  ossAcl?: 'private' | 'public-read' | 'public-read-write'
   // Immich 配置
   immichEndpoint?: string
   immichApiKey?: string
@@ -97,6 +116,8 @@ export interface CachePluginConfig extends LocalCacheConfig, StorageConfig {
   s3Schemes?: S3SchemeRow[]
   /** 额外的 WebDAV 存储方案 */
   webdavSchemes?: WebdavSchemeRow[]
+  /** 额外的阿里云 OSS 存储方案 */
+  ossSchemes?: OSSSchemeRow[]
   /** @deprecated 旧的 schemes 字段，用于向后兼容 */
   schemes?: StorageScheme[]
 }
@@ -132,6 +153,19 @@ export interface WebdavSchemeRow {
   webdavPublicBaseUrl?: string
 }
 
+/** 阿里云 OSS 方案表格行 */
+export interface OSSSchemeRow {
+  name: string
+  ossEndpoint?: string
+  ossRegion?: string
+  ossAccessKeyId?: string
+  ossAccessKeySecret?: string
+  ossBucket?: string
+  ossPublicBaseUrl?: string
+  ossCname?: boolean
+  ossAcl?: 'private' | 'public-read' | 'public-read-write'
+}
+
 // ============ 配置字段定义 ============
 
 /** 配置字段 */
@@ -153,6 +187,7 @@ export const cacheConfigFields: ConfigField[] = [
     options: [
       { label: '本地存储', value: 'local' },
       { label: 'S3 对象存储', value: 's3' },
+      { label: '阿里云 OSS', value: 'oss' },
       { label: 'WebDAV', value: 'webdav' },
       { label: '不使用（仅临时）', value: 'none' }
     ]
@@ -299,6 +334,68 @@ export const cacheConfigFields: ConfigField[] = [
     description: 'WebDAV 文件公开访问 URL 前缀',
     showWhen: { field: 'backend', value: 'webdav' }
   },
+  // 阿里云 OSS 配置
+  {
+    key: 'ossEndpoint',
+    label: 'OSS 端点',
+    type: 'text',
+    default: '',
+    description: 'OSS 服务端点（如 oss-cn-hangzhou.aliyuncs.com）',
+    showWhen: { field: 'backend', value: 'oss' }
+  },
+  {
+    key: 'ossAccessKeyId',
+    label: 'AccessKey ID',
+    type: 'text',
+    default: '',
+    description: '阿里云 AccessKey ID',
+    showWhen: { field: 'backend', value: 'oss' }
+  },
+  {
+    key: 'ossAccessKeySecret',
+    label: 'AccessKey Secret',
+    type: 'text',
+    default: '',
+    description: '阿里云 AccessKey Secret',
+    showWhen: { field: 'backend', value: 'oss' }
+  },
+  {
+    key: 'ossBucket',
+    label: 'Bucket 名称',
+    type: 'text',
+    default: '',
+    description: 'OSS 存储桶名称',
+    showWhen: { field: 'backend', value: 'oss' }
+  },
+  {
+    key: 'ossPublicBaseUrl',
+    label: '公开访问 URL',
+    type: 'text',
+    default: '',
+    description: 'OSS 公开访问 URL 前缀（用于生成可访问链接，如 CDN 域名）',
+    showWhen: { field: 'backend', value: 'oss' }
+  },
+  {
+    key: 'ossCname',
+    label: '使用自定义域名',
+    type: 'boolean',
+    default: false,
+    description: '是否使用自定义域名（CNAME）模式',
+    showWhen: { field: 'backend', value: 'oss' }
+  },
+  {
+    key: 'ossAcl',
+    label: '访问控制',
+    type: 'select',
+    default: 'public-read',
+    description: '上传文件的访问控制策略',
+    options: [
+      { label: '公开可读', value: 'public-read' },
+      { label: '公开读写', value: 'public-read-write' },
+      { label: '私有', value: 'private' }
+    ],
+    showWhen: { field: 'backend', value: 'oss' }
+  },
   // 通用配置
   {
     key: 'maxCacheSize',
@@ -366,6 +463,22 @@ export const cacheConfigFields: ConfigField[] = [
       { key: 'webdavPassword', label: '密码', type: 'text', required: true },
       { key: 'webdavBasePath', label: '基础路径', type: 'text', placeholder: '/media-luna' },
       { key: 'webdavPublicBaseUrl', label: '公开URL', type: 'text', placeholder: 'https://cdn.example.com' }
+    ]
+  },
+  // 额外的阿里云 OSS 存储方案
+  {
+    key: 'ossSchemes',
+    label: '阿里云 OSS 存储方案',
+    type: 'table',
+    default: [],
+    description: '配置额外的阿里云 OSS 存储方案，可在中间件中通过方案名选择使用',
+    columns: [
+      { key: 'name', label: '方案名', type: 'text', required: true, width: '80px', placeholder: '如: images' },
+      { key: 'ossEndpoint', label: '端点', type: 'text', required: true, placeholder: 'oss-cn-hangzhou.aliyuncs.com' },
+      { key: 'ossBucket', label: 'Bucket', type: 'text', required: true, placeholder: 'my-bucket' },
+      { key: 'ossAccessKeyId', label: 'AccessKey ID', type: 'text', required: true },
+      { key: 'ossAccessKeySecret', label: 'AccessKey Secret', type: 'text', required: true },
+      { key: 'ossPublicBaseUrl', label: '公开URL', type: 'text', placeholder: 'https://cdn.example.com' }
     ]
   }
 ]
@@ -442,6 +555,26 @@ export function getAllSchemes(config: CachePluginConfig): StorageScheme[] {
     }
   }
 
+  // 从 ossSchemes 表格转换
+  if (config.ossSchemes && Array.isArray(config.ossSchemes)) {
+    for (const row of config.ossSchemes) {
+      if (row.name) {
+        schemes.push({
+          name: row.name,
+          type: 'oss',
+          ossEndpoint: row.ossEndpoint,
+          ossRegion: row.ossRegion,
+          ossAccessKeyId: row.ossAccessKeyId,
+          ossAccessKeySecret: row.ossAccessKeySecret,
+          ossBucket: row.ossBucket,
+          ossPublicBaseUrl: row.ossPublicBaseUrl,
+          ossCname: row.ossCname,
+          ossAcl: row.ossAcl
+        })
+      }
+    }
+  }
+
   // 兼容旧的 schemes 字段
   const legacySchemes = parseSchemes(config.schemes)
   for (const scheme of legacySchemes) {
@@ -502,6 +635,18 @@ export function schemeToStorageConfig(scheme: StorageScheme): Partial<StorageCon
         webdavPassword: scheme.webdavPassword,
         webdavBasePath: scheme.webdavBasePath,
         webdavPublicBaseUrl: scheme.webdavPublicBaseUrl
+      }
+    case 'oss':
+      return {
+        backend: 'oss',
+        ossEndpoint: scheme.ossEndpoint,
+        ossRegion: scheme.ossRegion,
+        ossAccessKeyId: scheme.ossAccessKeyId,
+        ossAccessKeySecret: scheme.ossAccessKeySecret,
+        ossBucket: scheme.ossBucket,
+        ossPublicBaseUrl: scheme.ossPublicBaseUrl,
+        ossCname: scheme.ossCname,
+        ossAcl: scheme.ossAcl
       }
   }
 }

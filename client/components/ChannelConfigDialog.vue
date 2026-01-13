@@ -1,6 +1,6 @@
 <template>
-  <!-- 整体容器：使用 Teleport 确保在 body 层级 -->
-  <Teleport to="body">
+  <!-- 整体容器：使用 Teleport 确保在弹出层层级 -->
+  <Teleport to="#ml-teleport-container" defer>
     <Transition name="dialog-slide">
       <div v-if="visible" class="channel-config-container">
         <!-- 遮罩层 -->
@@ -142,6 +142,7 @@
                             :placeholder="mw.enabled ? '全局: 启用' : '全局: 禁用'"
                             clearable
                             size="small"
+                            :teleported="false"
                             class="mw-switch"
                           >
                             <el-option label="启用" :value="true" />

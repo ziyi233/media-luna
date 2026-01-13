@@ -738,6 +738,7 @@ onMounted(() => {
   cursor: pointer;
   display: flex;
   flex-direction: column;
+  border-radius: var(--ml-radius-lg);
 }
 
 .channel-card.disabled {
@@ -931,6 +932,7 @@ onMounted(() => {
   align-items: center;
   gap: 0.5rem;
   background-color: var(--ml-bg-alt);
+  border-radius: 0 0 calc(var(--ml-radius-lg) - 3px) calc(var(--ml-radius-lg) - 3px);
 }
 
 .spacer {

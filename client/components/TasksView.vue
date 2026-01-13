@@ -310,7 +310,7 @@
     </div>
 
     <!-- 任务详情对话框 -->
-    <Teleport to="body">
+    <Teleport to="#ml-teleport-container" defer>
       <div v-if="detailVisible" class="modal-overlay" @click.self="detailVisible = false">
         <div class="modal-dialog large pop-card no-hover">
           <div class="modal-header">
@@ -381,7 +381,7 @@
     />
 
     <!-- 清理对话框 -->
-    <Teleport to="body">
+    <Teleport to="#ml-teleport-container" defer>
       <div v-if="cleanupVisible" class="modal-overlay" @click.self="cleanupVisible = false">
         <div class="modal-dialog small pop-card no-hover">
           <div class="modal-header">
@@ -403,7 +403,7 @@
     </Teleport>
 
     <!-- 删除确认对话框 -->
-    <Teleport to="body">
+    <Teleport to="#ml-teleport-container" defer>
       <div v-if="deleteConfirmVisible" class="modal-overlay" @click.self="deleteConfirmVisible = false">
         <div class="modal-dialog small pop-card no-hover">
           <div class="modal-header">
@@ -432,7 +432,7 @@
     </Teleport>
 
     <!-- 批量删除确认对话框 -->
-    <Teleport to="body">
+    <Teleport to="#ml-teleport-container" defer>
       <div v-if="batchDeleteVisible" class="modal-overlay" @click.self="batchDeleteVisible = false">
         <div class="modal-dialog small pop-card no-hover">
           <div class="modal-header">

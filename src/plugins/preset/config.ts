@@ -67,8 +67,8 @@ export const remoteSyncConfigFields: ConfigField[] = [
     key: 'uploadUrl',
     label: '上传地址',
     type: 'text',
-    default: 'https://prompt.vioaki.xyz/upload',
-    placeholder: 'https://prompt.vioaki.xyz/upload',
+    default: 'https://prompt.vioaki.xyz/api/upload',
+    placeholder: 'https://prompt.vioaki.xyz/api/upload',
     description: '上传作品/模板的地址，留空则禁用上传功能'
   },
   {
@@ -121,7 +121,7 @@ export const defaultPresetConfig: PresetPluginConfig = {
   enabled: true,
   defaultPreset: '',
   apiUrl: 'https://prompt.vioaki.xyz/api/templates?per_page=-1',
-  uploadUrl: 'https://prompt.vioaki.xyz/upload',
+  uploadUrl: 'https://prompt.vioaki.xyz/api/upload',
   defaultAuthor: '',
   autoSync: false,
   syncInterval: 60,

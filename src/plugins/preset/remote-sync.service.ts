@@ -312,6 +312,17 @@ export class RemoteSyncService {
             result.updated++
             this._logger.debug('Updated preset: %s', template.title)
           } else {
+            // 创建新预设前，检查是否与现有用户预设重复（通过 prompt 内容匹配）
+            const duplicate = await this._findDuplicateUserPreset(presetData.promptTemplate)
+            if (duplicate) {
+              // 发现重复，将新的远程预设默认禁用
+              presetData.enabled = false
+              this._logger.info(
+                'Found duplicate user preset "%s", disabling synced preset "%s"',
+                duplicate.name,
+                template.title
+              )
+            }
             await this._presetService.create(presetData)
             result.added++
             this._logger.debug('Created preset: %s', template.title)
@@ -376,6 +387,23 @@ export class RemoteSyncService {
     if (newRemote.length > 0 && existing.referenceImages.length === 0) return true
 
     return false
+  }
+
+  /**
+   * 查找与指定 prompt 内容重复的用户预设
+   * 用于避免上传后同步导致重复预设
+   */
+  private async _findDuplicateUserPreset(promptTemplate: string): Promise<PresetData | null> {
+    // 获取所有用户创建的预设（source = 'user'）
+    const allPresets = await this._presetService.list()
+    const userPresets = allPresets.filter(p => p.source === 'user')
+
+    // 标准化 prompt 进行比较（去除首尾空白、统一换行符）
+    const normalize = (s: string) => s.trim().replace(/\r\n/g, '\n')
+    const normalizedPrompt = normalize(promptTemplate)
+
+    // 查找 prompt 内容完全匹配的用户预设
+    return userPresets.find(p => normalize(p.promptTemplate) === normalizedPrompt) || null
   }
 
   /** 启动定时同步 */
@@ -475,13 +503,17 @@ export class RemoteSyncService {
       // 主图片（必填）
       if (data.image) {
         formData.append('image', data.image)
+        this._logger.debug('Using provided image blob')
       } else if (data.imageUrl) {
         // 从 URL 下载图片
+        this._logger.debug('Downloading main image from: %s', data.imageUrl)
         const imageBlob = await this._fetchImageAsBlob(data.imageUrl)
         if (imageBlob) {
-          formData.append('image', imageBlob, 'image.png')
+          const ext = this._getExtFromMime(imageBlob.type)
+          formData.append('image', imageBlob, `image${ext}`)
+          this._logger.debug('Main image downloaded: %s, size: %d bytes', imageBlob.type, imageBlob.size)
         } else {
-          return { success: false, error: 'Failed to fetch main image from URL' }
+          return { success: false, error: `Failed to fetch main image from URL: ${data.imageUrl}` }
         }
       } else {
         return { success: false, error: 'Main image is required' }
@@ -503,56 +535,47 @@ export class RemoteSyncService {
 
       // 参考图片（仅 img2img）
       if (data.type === 'img2img' && data.referenceImages && data.referenceImages.length > 0) {
-        const layout: string[] = []
-
         for (let i = 0; i < data.referenceImages.length; i++) {
           const ref = data.referenceImages[i]
-          if (ref.isPlaceholder) {
-            layout.push('placeholder')
-          } else if (ref.blob) {
-            formData.append('ref_images', ref.blob, `ref_${i}.png`)
-            layout.push('new')
+          // 跳过占位符
+          if (ref.isPlaceholder) continue
+
+          if (ref.blob) {
+            const ext = this._getExtFromMime(ref.blob.type)
+            formData.append('ref_images', ref.blob, `ref_${i}${ext}`)
           } else if (ref.url) {
             const refBlob = await this._fetchImageAsBlob(ref.url)
             if (refBlob) {
-              formData.append('ref_images', refBlob, `ref_${i}.png`)
-              layout.push('new')
+              const ext = this._getExtFromMime(refBlob.type)
+              formData.append('ref_images', refBlob, `ref_${i}${ext}`)
             }
           }
         }
-
-        if (layout.length > 0) {
-          formData.append('ref_layout', JSON.stringify(layout))
-        }
       }
 
-      // 发送请求
-      const response = await fetch(uploadUrl, {
-        method: 'POST',
-        body: formData,
-        signal: AbortSignal.timeout(60000) // 上传超时 60 秒
+      // 发送请求 - 使用 Koishi 的 HTTP 客户端
+      this._logger.debug('Sending upload request to: %s', uploadUrl)
+
+      // Koishi HTTP 客户端支持 FormData
+      const json = await this._ctx.http.post(uploadUrl, formData, {
+        timeout: 60000
       })
 
-      // Prompt-Manager 上传成功返回 HTML 页面，而非 JSON
-      // 检查是否成功（状态码 200 且响应中包含 success 相关内容）
-      if (response.ok) {
-        const responseText = await response.text()
-        // 检查是否是成功页面（包含 "发布成功" 或类似内容）
-        if (responseText.includes('发布成功') || responseText.includes('success')) {
-          this._logger.info('Upload successful')
-          return { success: true }
-        } else if (responseText.includes('待审核') || responseText.includes('pending')) {
-          this._logger.info('Upload successful, pending review')
-          return { success: true, pending: true }
-        }
+      this._logger.debug('Upload response: %o', json)
+
+      // 检查响应
+      // API 返回 JSON 格式 { code: 200/201, message: "..." }
+      if (json.code === 200 || json.code === 201 || json.success) {
+        this._logger.info('Upload successful')
+        return { success: true }
       }
 
       // 上传失败
-      const errorText = await response.text().catch(() => response.statusText)
-      this._logger.error('Upload failed: %s %s', response.status, errorText)
+      const errorMsg = json.message || json.error || 'Unknown error'
+      this._logger.error('Upload failed: %s', errorMsg)
       return {
         success: false,
-        error: `Upload failed: ${response.status} ${errorText.substring(0, 200)}`
+        error: errorMsg
       }
     } catch (error: any) {
       this._logger.error('Upload error: %s', error)
@@ -566,15 +589,53 @@ export class RemoteSyncService {
   /** 从 URL 获取图片 Blob */
   private async _fetchImageAsBlob(url: string): Promise<Blob | null> {
     try {
-      const response = await fetch(url, {
-        signal: AbortSignal.timeout(30000)
-      })
-      if (!response.ok) return null
-      return await response.blob()
+      this._logger.debug('Fetching image from: %s', url)
+
+      // 使用 Koishi 的 http 服务，可以正确处理本地和远程 URL
+      const response = await this._ctx.http.get(url, {
+        responseType: 'arraybuffer',
+        timeout: 30000
+      }) as ArrayBuffer
+
+      if (!response || response.byteLength === 0) {
+        this._logger.warn('Empty response when fetching image')
+        return null
+      }
+
+      // 根据 URL 或响应推断 MIME 类型
+      const mime = this._getMimeFromUrl(url)
+      this._logger.debug('Fetched image: %d bytes, mime: %s', response.byteLength, mime)
+
+      return new Blob([response], { type: mime })
     } catch (error) {
       this._logger.warn('Failed to fetch image from %s: %s', url, error)
       return null
     }
+  }
+
+  /** 根据 URL 推断 MIME 类型 */
+  private _getMimeFromUrl(url: string): string {
+    const lower = url.toLowerCase()
+    if (lower.includes('.png')) return 'image/png'
+    if (lower.includes('.jpg') || lower.includes('.jpeg')) return 'image/jpeg'
+    if (lower.includes('.gif')) return 'image/gif'
+    if (lower.includes('.webp')) return 'image/webp'
+    if (lower.includes('.bmp')) return 'image/bmp'
+    // 默认 PNG
+    return 'image/png'
+  }
+
+  /** 根据 MIME 类型获取文件扩展名 */
+  private _getExtFromMime(mime: string): string {
+    const map: Record<string, string> = {
+      'image/png': '.png',
+      'image/jpeg': '.jpg',
+      'image/jpg': '.jpg',
+      'image/gif': '.gif',
+      'image/webp': '.webp',
+      'image/bmp': '.bmp'
+    }
+    return map[mime] || '.png'
   }
 }
 

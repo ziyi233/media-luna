@@ -1,5 +1,5 @@
 <template>
-  <teleport to="body">
+  <teleport to="#ml-teleport-container" defer>
     <transition name="lightbox-fade">
       <div v-if="visible" class="lightbox-overlay" @click.self="close">
         <div class="lightbox-container">

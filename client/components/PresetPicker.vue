@@ -29,6 +29,7 @@
       width="80vw"
       top="5vh"
       :close-on-click-modal="true"
+      :teleported="false"
       class="preset-picker-dialog"
     >
       <!-- 搜索和筛选 - 复用 PresetsView 的筛选样式 -->
@@ -130,6 +131,7 @@
       :title="detailPreset?.name || '预设详情'"
       width="600px"
       :close-on-click-modal="true"
+      :teleported="false"
       class="preset-detail-dialog"
     >
       <div v-if="detailPreset" class="preset-detail">

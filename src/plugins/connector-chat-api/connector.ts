@@ -42,6 +42,22 @@ function getMediaKind(url: string): 'image' | 'video' | 'audio' | null {
     if (lowerUrl.includes(ext)) return kind
   }
 
+  // 3. 启发式：URL 路径包含媒体类型关键词
+  try {
+    const pathname = new URL(url).pathname.toLowerCase()
+    if (pathname.includes('/image') || pathname.includes('/img') || pathname.includes('/photo')) {
+      return 'image'
+    }
+    if (pathname.includes('/video') || pathname.includes('/vid')) {
+      return 'video'
+    }
+    if (pathname.includes('/audio') || pathname.includes('/sound') || pathname.includes('/music')) {
+      return 'audio'
+    }
+  } catch {
+    // URL 解析失败，忽略
+  }
+
   return null
 }
 
@@ -57,13 +73,23 @@ function extractMediaFromContent(content: string, mode: string): OutputAsset[] {
   const assets: OutputAsset[] = []
   const seenUrls = new Set<string>()
 
-  // 统一的 URL 正则：匹配 http/https URL
-  const urlRegex = /https?:\/\/[^\s"'<>\[\]{}()]+/g
+  // 1. 优先提取 Markdown 图片语法: ![alt](url)
+  const markdownImgRegex = /!\[[^\]]*\]\((https?:\/\/[^)]+)\)/g
   let match
+  while ((match = markdownImgRegex.exec(content)) !== null) {
+    const url = match[1]
+    if (!seenUrls.has(url)) {
+      seenUrls.add(url)
+      // Markdown 图片语法明确是图片
+      assets.push({ kind: 'image', url })
+    }
+  }
 
+  // 2. 提取普通 URL
+  const urlRegex = /https?:\/\/[^\s"'<>\[\]{}]+/g
   while ((match = urlRegex.exec(content)) !== null) {
     let url = match[0]
-    // 清理末尾标点和 markdown 残留
+    // 清理末尾标点和括号
     url = url.replace(/[.,;:!?)]+$/, '')
 
     if (seenUrls.has(url)) continue
@@ -186,12 +212,14 @@ async function generate(
   if (stream) {
     // 处理流式响应
     const lines = (response as string).split('\n')
-    let isSSE = false
     for (const line of lines) {
-      if (line.trim().startsWith('data: ')) {
-        isSSE = true
-        const data = line.trim().slice(6)
-        if (data === '[DONE]') break
+      const trimmedLine = line.trim()
+      if (!trimmedLine) continue
+
+      // SSE 格式: data: {...}
+      if (trimmedLine.startsWith('data: ')) {
+        const data = trimmedLine.slice(6)
+        if (data === '[DONE]') continue
         try {
           const json = JSON.parse(data)
           const delta = json.choices?.[0]?.delta?.content
@@ -200,10 +228,29 @@ async function generate(
           // ignore parse error
         }
       }
+      // 非 SSE 格式：每行直接是 JSON（某些 API 的流式格式）
+      else if (trimmedLine.startsWith('{')) {
+        try {
+          const json = JSON.parse(trimmedLine)
+          // 尝试 delta 格式
+          const delta = json.choices?.[0]?.delta?.content
+          if (delta) {
+            content += delta
+            continue
+          }
+          // 尝试 message 格式
+          const message = json.choices?.[0]?.message?.content
+          if (message) {
+            content += message
+          }
+        } catch (e) {
+          // ignore parse error
+        }
+      }
     }
 
-    // 如果没有解析出 SSE 内容，尝试直接解析
-    if (!isSSE && !content) {
+    // 如果没有解析出内容，尝试直接解析整个响应
+    if (!content) {
       try {
         const json = JSON.parse(response as string)
         content = json.choices?.[0]?.message?.content || ''

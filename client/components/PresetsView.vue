@@ -1288,8 +1288,9 @@ onMounted(fetchData)
 .tag-more {
   font-size: 10px;
   padding: 2px 6px;
-  background: var(--ml-primary);
-  color: var(--ml-text);
+  background: var(--ml-bg-alt);
+  color: var(--ml-text-muted);
+  border: 1px solid var(--ml-border-color);
   border-radius: 6px;
   font-weight: 700;
 }

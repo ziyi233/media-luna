@@ -129,6 +129,7 @@ const showVersionTooltip = ref(false)
 
 // 主题切换
 const themes = [
+  { id: 'material', icon: '⚪', label: '简约' },
   { id: 'nailong', icon: '☀️', label: '奶龙' },
   { id: 'sakura', icon: '🌸', label: '樱花' },
   { id: 'matcha', icon: '🍵', label: '抹茶' },

@@ -25,7 +25,8 @@
   --ml-text-muted: #92400e;
 
   /* Header Background (Glassmorphism base) */
-  --ml-header-bg: rgba(255, 251, 235, 0.8); /* Cream alpha */
+  --ml-header-bg: rgba(255, 251, 235, 0.8);
+  /* Cream alpha */
 
   /* Borders & Shadows */
   --ml-border-width: 3px;
@@ -67,21 +68,31 @@
  * Sweet, Soft, Romantic
  */
 .theme-sakura {
-  --ml-primary: #f472b6;       /* Pink 400 */
-  --ml-primary-dark: #db2777;  /* Pink 600 */
-  --ml-primary-light: #fce7f3; /* Pink 100 */
+  --ml-primary: #f472b6;
+  /* Pink 400 */
+  --ml-primary-dark: #db2777;
+  /* Pink 600 */
+  --ml-primary-light: #fce7f3;
+  /* Pink 100 */
 
-  --ml-bg: #fff1f2;            /* Rose 50 */
-  --ml-bg-alt: #ffe4e6;        /* Rose 100 */
+  --ml-bg: #fff1f2;
+  /* Rose 50 */
+  --ml-bg-alt: #ffe4e6;
+  /* Rose 100 */
   --ml-surface: #ffffff;
 
-  --ml-text: #4c0519;          /* Rose 950 (Almost Black) */
-  --ml-text-secondary: #9f1239;/* Rose 800 */
-  --ml-text-muted: #be123c;    /* Rose 700 */
+  --ml-text: #4c0519;
+  /* Rose 950 (Almost Black) */
+  --ml-text-secondary: #9f1239;
+  /* Rose 800 */
+  --ml-text-muted: #be123c;
+  /* Rose 700 */
 
-  --ml-header-bg: rgba(255, 241, 242, 0.8); /* Rose 50 alpha */
+  --ml-header-bg: rgba(255, 241, 242, 0.8);
+  /* Rose 50 alpha */
 
-  --ml-border-color: #f43f5e;  /* Rose 500 */
+  --ml-border-color: #f43f5e;
+  /* Rose 500 */
   /* Keep standard border width/shadows of Pop theme */
 }
 
@@ -90,21 +101,31 @@
  * Natural, Fresh, Relaxing
  */
 .theme-matcha {
-  --ml-primary: #84cc16;       /* Lime 500 */
-  --ml-primary-dark: #4d7c0f;  /* Lime 700 */
-  --ml-primary-light: #ecfccb; /* Lime 100 */
+  --ml-primary: #84cc16;
+  /* Lime 500 */
+  --ml-primary-dark: #4d7c0f;
+  /* Lime 700 */
+  --ml-primary-light: #ecfccb;
+  /* Lime 100 */
 
-  --ml-bg: #f7fee7;            /* Lime 50 */
-  --ml-bg-alt: #d9f99d;        /* Lime 200 */
+  --ml-bg: #f7fee7;
+  /* Lime 50 */
+  --ml-bg-alt: #d9f99d;
+  /* Lime 200 */
   --ml-surface: #ffffff;
 
-  --ml-text: #052e16;          /* Green 950 (Almost Black) */
-  --ml-text-secondary: #166534;/* Green 800 */
-  --ml-text-muted: #15803d;    /* Green 700 */
+  --ml-text: #052e16;
+  /* Green 950 (Almost Black) */
+  --ml-text-secondary: #166534;
+  /* Green 800 */
+  --ml-text-muted: #15803d;
+  /* Green 700 */
 
-  --ml-header-bg: rgba(247, 254, 231, 0.8); /* Lime 50 alpha */
+  --ml-header-bg: rgba(247, 254, 231, 0.8);
+  /* Lime 50 alpha */
 
-  --ml-border-color: #65a30d;  /* Lime 600 */
+  --ml-border-color: #65a30d;
+  /* Lime 600 */
   /* Keep standard border width/shadows of Pop theme */
 }
 
@@ -115,7 +136,8 @@
 .theme-manga {
   /* Primary Button: White background with Black border (Outline style) */
   --ml-primary: #ffffff;
-  --ml-primary-dark: #000000; /* Hover/Active turns Black */
+  --ml-primary-dark: #000000;
+  /* Hover/Active turns Black */
   --ml-primary-light: #e5e5e5;
 
   --ml-bg: #ffffff;
@@ -133,7 +155,8 @@
 
 /* Manga Theme Button Override: Invert on Hover */
 .theme-manga .pop-btn.primary:hover {
-  background: var(--ml-primary-dark); /* Black */
+  background: var(--ml-primary-dark);
+  /* Black */
   color: #ffffff;
 }
 
@@ -213,6 +236,195 @@
 .theme-plain .ml-app {
   background-image: none;
 }
+
+/*
+ * [Theme - Material (Strict Grayscale/Flat)]
+ * Black, White, Gray Only. No Pop effects.
+ */
+.theme-material {
+  /* Monochrome Palette */
+  --ml-primary: #212121;
+  /* Grey 900 */
+  --ml-primary-dark: #000000;
+  /* Black */
+  --ml-primary-light: #e0e0e0;
+  /* Grey 300 */
+
+  --ml-bg: #f5f5f5;
+  /* Grey 100 */
+  --ml-bg-alt: #ffffff;
+  /* White */
+  --ml-surface: #ffffff;
+
+  --ml-text: #212121;
+  /* Grey 900 */
+  --ml-text-secondary: #616161;
+  /* Grey 700 */
+  --ml-text-muted: #9e9e9e;
+  /* Grey 500 */
+
+  --ml-header-bg: rgba(255, 255, 255, 0.95);
+
+  /* Flat Borders */
+  --ml-border-width: 1px;
+  --ml-border-color: #e0e0e0;
+  /* Grey 300 */
+
+  /* No Shadows */
+  --ml-shadow: none;
+  --ml-shadow-sm: none;
+  --ml-shadow-lg: none;
+
+  /* Standard Radius */
+  --ml-radius-sm: 4px;
+  --ml-radius: 4px;
+  --ml-radius-lg: 4px;
+  --ml-radius-xl: 4px;
+
+  /* Faster Transition */
+  --ml-transition: 0.2s ease;
+
+  /* Grayscale Status Colors */
+  --ml-success: #616161;
+  --ml-success-bg: #eeeeee;
+  --ml-success-border: #bdbdbd;
+
+  --ml-warning: #757575;
+  --ml-warning-bg: #fafafa;
+  --ml-warning-border: #bdbdbd;
+
+  --ml-error: #424242;
+  --ml-error-bg: #eeeeee;
+  --ml-error-border: #9e9e9e;
+
+  --ml-info: #616161;
+  --ml-info-bg: #eeeeee;
+  --ml-info-border: #bdbdbd;
+
+  --ml-cream: #f5f5f5;
+}
+
+/* Material Theme Overrides */
+.theme-material .pop-btn.primary {
+  color: #ffffff;
+}
+
+/* Disable hover transforms for Material theme */
+.theme-material .pop-card:hover,
+.theme-material .pop-btn:hover,
+.theme-material .filter-tag:hover,
+.theme-material .item-card:hover,
+.theme-material .upload-area:hover,
+.theme-material .image-preview {
+  transform: none !important;
+}
+
+/* Material Card Overrides */
+.theme-material .pop-card {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+  border: 1px solid var(--ml-border-color);
+}
+
+.theme-material .pop-card:hover {
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.16);
+}
+
+/* Material Button Overrides */
+.theme-material .pop-btn {
+  box-shadow: none;
+  border: 1px solid var(--ml-border-color);
+  border-radius: 4px;
+  text-transform: uppercase;
+  /* Material Design style */
+  font-weight: 500;
+  letter-spacing: 0.5px;
+}
+
+.theme-material .pop-btn:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+  box-shadow: none;
+}
+
+.theme-material .pop-btn.primary:hover {
+  background-color: var(--ml-primary-dark);
+}
+
+.theme-material .pop-btn:active {
+  transform: none;
+  background-color: rgba(0, 0, 0, 0.1);
+}
+
+/* Material Inputs */
+.theme-material .pop-input,
+.theme-material .pop-select,
+.theme-material .pop-textarea {
+  border: 1px solid #bdbdbd;
+  border-radius: 4px;
+  background: #fafafa;
+}
+
+.theme-material .pop-input:focus,
+.theme-material .pop-select:focus,
+.theme-material .pop-textarea:focus {
+  border-color: var(--ml-primary);
+  box-shadow: none;
+  background: #ffffff;
+}
+
+/* Remove dot pattern background */
+.theme-material.ml-app,
+.theme-material .ml-app {
+  background-image: none;
+}
+
+/* ============ Material Refinements (User Request) ============ */
+
+/* 1. Selection Highlight (Blue Border, No Black BG) */
+.theme-material .pop-btn.active,
+.theme-material .nav-tab.active,
+.theme-material .group-btn.active {
+  background-color: transparent !important;
+  color: #2196F3 !important;
+  /* Material Blue */
+  border-color: #2196F3 !important;
+  border-width: 2px !important;
+  box-shadow: none !important;
+}
+
+/* 2. Toggle Switch Overrides */
+/* 
+ * Since switches are often scoped, we use deep selectors or global override 
+ * targeting the structure: .toggle-switch input + .toggle-slider 
+ */
+.theme-material .toggle-switch .toggle-slider {
+  background-color: #e0e0e0 !important;
+  /* Gray when off */
+  border-color: #bdbdbd !important;
+}
+
+.theme-material .toggle-switch input:checked+.toggle-slider {
+  background-color: #4CAF50 !important;
+  /* Green when on */
+  border-color: #4CAF50 !important;
+}
+
+.theme-material .toggle-switch .toggle-slider::before {
+  background-color: #ffffff !important;
+  /* White knob */
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  /* Subtle shadow for knob */
+}
+
+/* Adjust knob position if needed */
+.theme-material .toggle-switch input:checked+.toggle-slider::before {
+  background-color: #ffffff !important;
+}
+
+/* Ensure switch wrapper has no extra borders */
+.theme-material .toggle-switch {
+  border: none !important;
+}
+
 
 
 /* ============ 基础容器 ============ */
@@ -708,6 +920,7 @@
       opacity: 0;
       transform: scale(0.8) translateY(20px);
     }
+
     to {
       opacity: 1;
       transform: scale(1) translateY(0);
@@ -938,19 +1151,27 @@
   }
 
   @media (max-width: 1400px) {
-    .ml-masonry { columns: 4; }
+    .ml-masonry {
+      columns: 4;
+    }
   }
 
   @media (max-width: 1100px) {
-    .ml-masonry { columns: 3; }
+    .ml-masonry {
+      columns: 3;
+    }
   }
 
   @media (max-width: 800px) {
-    .ml-masonry { columns: 2; }
+    .ml-masonry {
+      columns: 2;
+    }
   }
 
   @media (max-width: 500px) {
-    .ml-masonry { columns: 1; }
+    .ml-masonry {
+      columns: 1;
+    }
   }
 
   /* ============ 隐藏式滚动条 (兼容旧类名) ============ */
@@ -1083,6 +1304,7 @@
 
 /* Element Plus 组件文字样式修正 */
 .ml-app {
+
   /* 输入框 */
   .el-input__inner,
   .el-textarea__inner {

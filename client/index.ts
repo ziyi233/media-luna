@@ -1,5 +1,6 @@
 import { Context, icons } from '@koishijs/client'
-import type {} from 'koishi-plugin-media-luna'
+import type { } from 'koishi-plugin-media-luna'
+import './styles/material.css'
 
 import Index from './pages/index.vue'
 import LunaCrescent from './icons/luna-crescent.vue'

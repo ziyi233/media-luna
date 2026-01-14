@@ -160,19 +160,27 @@
 }
 
 @media (max-width: 1400px) {
-  .ml-masonry { columns: 4; }
+  .ml-masonry {
+    columns: 4;
+  }
 }
 
 @media (max-width: 1100px) {
-  .ml-masonry { columns: 3; }
+  .ml-masonry {
+    columns: 3;
+  }
 }
 
 @media (max-width: 800px) {
-  .ml-masonry { columns: 2; }
+  .ml-masonry {
+    columns: 2;
+  }
 }
 
 @media (max-width: 500px) {
-  .ml-masonry { columns: 1; }
+  .ml-masonry {
+    columns: 1;
+  }
 }
 
 /* ========== 栅格布局 ========== */
@@ -276,8 +284,13 @@
 
 /* ========== 动画 ========== */
 @keyframes ml-spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .ml-spin {
@@ -285,8 +298,13 @@
 }
 
 @keyframes ml-fade-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
 }
 
 .ml-fade-in {
@@ -335,27 +353,32 @@
   background-color: var(--ml-text-secondary, #92400e);
 }
 
-/* ========== 朴素模式覆盖 ========== */
-/* 朴素模式下禁用波普风格的变换效果和阴影 */
-.theme-plain .ml-card {
+/* ========== 朴素模式与 Material 模式覆盖 ========== */
+/* 禁用波普风格的变换效果和阴影 */
+.theme-plain .ml-card,
+.theme-material .ml-card {
   box-shadow: none;
   border-width: 1px;
 }
 
-.theme-plain .ml-card--clickable:hover {
+.theme-plain .ml-card--clickable:hover,
+.theme-material .ml-card--clickable:hover {
   transform: none;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
-.theme-plain .ml-table-container {
+.theme-plain .ml-table-container,
+.theme-material .ml-table-container {
   box-shadow: none;
   border-width: 1px;
 }
 
-.theme-plain .ml-badge {
+.theme-plain .ml-badge,
+.theme-material .ml-badge {
   border-width: 1px;
 }
 
-.theme-plain .ml-tag {
+.theme-plain .ml-tag,
+.theme-material .ml-tag {
   border-width: 1px;
 }

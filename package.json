@@ -29,7 +29,7 @@
   "scripts": {
     "build:server": "tsc",
     "build:client": "koishi-console build",
-    "build": "yarn build:server && yarn build:client"
+    "build": "npm run build:server && npm run build:client"
   },
   "keywords": [
     "chatbot",

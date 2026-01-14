@@ -180,29 +180,41 @@
 
 /* Fix for CATEGORY TABS & SIDEBAR TABS (Create Channel Dialog) */
 /* User requested: White Background + Black Text for selected items */
+/* Fix for CATEGORY TABS & SIDEBAR TABS (Create Channel Dialog) */
+/* User requested: White Background + Black Text for selected items + BLUE Border */
 .theme-material .category-tab.active,
 .theme-material .tab-item.active {
     background-color: #ffffff !important;
     /* White Background */
     color: #000000 !important;
     /* Black Text */
-    border: 2px solid #000000 !important;
-    /* Black Border for visibility */
+    border: 2px solid #2196F3 !important;
+    /* BLUE Border for visibility */
     box-shadow: none !important;
     font-weight: 700 !important;
 }
 
+/* Fix for BADGES inside active tabs (eliminate black pills) */
+.theme-material .category-tab.active .tab-badge,
+.theme-material .tab-item.active .tab-badge,
+.theme-material .category-tab.active .category-count {
+    background-color: #ffffff !important;
+    color: #000000 !important;
+    border: 1px solid #2196F3 !important;
+}
+
 /* Fix for PRIMARY BUTTONS (New Channel, Create First Channel) */
-/* User requested: White Background + Black Text to match active tabs */
+/* User requested: White Background + Black Text + Blue Border */
 .theme-material .pop-btn.primary {
     background-color: #ffffff !important;
     color: #000000 !important;
-    border: 2px solid #000000 !important;
+    border: 2px solid #2196F3 !important;
     font-weight: 700 !important;
 }
 
 .theme-material .pop-btn.primary:hover {
     background-color: #f0f0f0 !important;
+    border-color: #1976D2 !important;
 }
 
 /* Fix for CLOSE BUTTON (Channel Config Dialog) */

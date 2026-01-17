@@ -149,7 +149,8 @@ export class RemoteSyncService {
       .sort((a, b) => a.position - b.position)
       .map(ref => ref.file_path)
 
-    const tags = [...new Set([template.type, ...template.tags].filter(Boolean))]
+    // txt2image 则替换为 text2image
+    const tags = [...new Set([template.type === 'txt2img' ? 'text2img' : template.type,...template.tags].filter(Boolean))]
     const thumbnailRemote = template.thumbnail_path || template.file_path || undefined
 
     return {

@@ -1049,6 +1049,90 @@ class MessageExtractor {
   }
 
   /**
+   * 获取视频并添加到 state
+   */
+  async fetchVideo(url: string | undefined, prefix: string): Promise<boolean> {
+    if (!url || this.state.processedUrls.has(url)) return false
+
+    this.state.processedUrls.add(url)
+    try {
+      this.logger.debug('Fetching video from %s', url)
+      const response = await this.ctx.http.get(url, { responseType: 'arraybuffer', timeout: 30000 })
+      const buffer = Buffer.from(response)
+
+      if (buffer.length === 0) {
+        this.logger.warn('Empty video response from %s', url)
+        return false
+      }
+
+      const arrayBuffer = buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength)
+
+      // 根据 URL 扩展名推断 mime type
+      let mime = 'video/mp4'
+      if (url.endsWith('.webm')) mime = 'video/webm'
+      if (url.endsWith('.mov')) mime = 'video/quicktime'
+      if (url.endsWith('.mkv')) mime = 'video/x-matroska'
+
+      this.state.files.push({
+        data: arrayBuffer,
+        mime,
+        filename: `${prefix}_${this.state.files.length}.${mime.split('/')[1] || 'mp4'}`
+      })
+
+      this.logger.debug('Fetched video: %s (%d bytes, %s)', prefix, buffer.length, mime)
+      return true
+    } catch (e: any) {
+      this.logger.warn('Failed to fetch video from %s: %s', prefix, e?.message || e)
+      return false
+    }
+  }
+
+  /**
+   * 检测图片 MIME 类型（通过魔数）
+   */
+  private detectMimeType(buffer: Buffer): string | null {
+    if (buffer.length < 4) return null
+
+    // PNG: 89 50 4E 47
+    if (buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4E && buffer[3] === 0x47) {
+      return 'image/png'
+    }
+    // JPEG: FF D8 FF
+    if (buffer[0] === 0xFF && buffer[1] === 0xD8 && buffer[2] === 0xFF) {
+      return 'image/jpeg'
+    }
+    // GIF: 47 49 46 38
+    if (buffer[0] === 0x47 && buffer[1] === 0x49 && buffer[2] === 0x46 && buffer[3] === 0x38) {
+      return 'image/gif'
+    }
+    // WebP: 52 49 46 46 ... 57 45 42 50
+    if (buffer[0] === 0x52 && buffer[1] === 0x49 && buffer[2] === 0x46 && buffer[3] === 0x46 &&
+        buffer.length > 11 && buffer[8] === 0x57 && buffer[9] === 0x45 && buffer[10] === 0x42 && buffer[11] === 0x50) {
+      return 'image/webp'
+    }
+    // BMP: 42 4D
+    if (buffer[0] === 0x42 && buffer[1] === 0x4D) {
+      return 'image/bmp'
+    }
+
+    return null
+  }
+
+  /**
+   * 根据 MIME 类型获取扩展名
+   */
+  private getExtFromMime(mime: string): string {
+    const map: Record<string, string> = {
+      'image/png': 'png',
+      'image/jpeg': 'jpg',
+      'image/gif': 'gif',
+      'image/webp': 'webp',
+      'image/bmp': 'bmp'
+    }
+    return map[mime] || 'png'
+  }
+
+  /**
    * 添加文本到提示词
    */
   addPrompt(text: string): void {

@@ -134,11 +134,6 @@
         </div>
       </div>
     </div>
-    <div style="display:none">
-       <style>
-         .upload-thumb { object-fit: cover; }
-       </style>
-    </div>
 
     <!-- 中间区域 -->
     <div class="preview-panel pop-scrollbar">
@@ -1945,5 +1940,9 @@ onUnmounted(() => {
 .file-link:hover {
   background-color: var(--ml-primary-light);
   transform: translateY(-2px);
+}
+
+.upload-thumb {
+  object-fit: cover;
 }
 </style>

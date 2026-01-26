@@ -4,9 +4,11 @@
     <div class="image-list" v-if="images.length > 0">
       <div v-for="(img, index) in images" :key="img.url || index" class="image-item">
         <div class="image-preview">
-          <img :src="img.previewUrl" :alt="img.filename" />
+          <img v-if="img.mime.startsWith('image/')" :src="img.previewUrl" :alt="img.filename" />
+          <video v-else-if="img.mime.startsWith('video/')" :src="img.previewUrl" class="video-preview"></video>
+          <div v-else class="unknown-file">❓</div>
           <div class="image-overlay">
-            <k-button size="mini" class="remove-btn" @click="removeImage(index)">
+            <k-button size="mini" class="remove-btn" @click.stop="removeImage(index)">
               <template #icon><k-icon name="delete"></k-icon></template>
             </k-button>
           </div>
@@ -20,14 +22,14 @@
       <input
         ref="fileInput"
         type="file"
-        accept="image/*"
+        accept="image/*,video/*"
         multiple
         style="display: none"
         @change="handleFileSelect"
       />
       <div class="upload-content">
         <k-icon name="add" class="upload-icon"></k-icon>
-        <span class="upload-text">点击或拖拽上传图片</span>
+        <span class="upload-text">点击或拖拽上传图片/视频</span>
       </div>
     </div>
 
@@ -72,11 +74,15 @@ const loadImages = async () => {
     // 跳过空值
     if (!url) continue
 
+    // 推断 mime type
+    let mime = 'image/png'
+    if (url.match(/\.(mp4|webm|mov|mkv)$/i)) mime = 'video/mp4'
+
     // 所有非空 URL 都应该可用（包括相对路径、http/https）
     newImages.push({
       url,
-      filename: url.split('/').pop()?.split('?')[0] || 'image',
-      mime: 'image/png',
+      filename: url.split('/').pop()?.split('?')[0] || (mime.startsWith('video/') ? 'video' : 'image'),
+      mime,
       previewUrl: url
     })
   }
@@ -108,7 +114,7 @@ const handleDrop = async (e: DragEvent) => {
   const files = e.dataTransfer?.files
   if (!files || files.length === 0) return
 
-  await uploadFiles(Array.from(files).filter(f => f.type.startsWith('image/')))
+  await uploadFiles(Array.from(files).filter(f => f.type.startsWith('image/') || f.type.startsWith('video/')))
 }
 
 // 上传文件
@@ -301,5 +307,11 @@ onMounted(() => {
 @keyframes spin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
+}
+
+.video-preview {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 </style>

@@ -170,6 +170,15 @@ async function generate(
             url: `data:${file.mime};base64,${base64}`
           }
         })
+      } else if (file.mime.startsWith('video/')) {
+        // 将视频转为 base64
+        const base64 = Buffer.from(file.data).toString('base64')
+        content.push({
+          type: 'video_url',
+          video_url: {
+            url: `data:${file.mime};base64,${base64}`
+          }
+        })
       }
     }
 
@@ -304,7 +313,8 @@ export const ChatApiConnector: ConnectorDefinition = {
         extractMode,
         temperature,
         maxTokens,
-        hasImages: files.some(f => f.mime.startsWith('image/'))
+        hasImages: files.some(f => f.mime.startsWith('image/')),
+        hasVideos: files.some(f => f.mime.startsWith('video/'))
       }
     }
   }

@@ -1,6 +1,6 @@
 // Koishi 聊天指令插件入口
 // 注册渠道名指令，支持收集模式
-
+import {} from 'koishi-plugin-adapter-onebot'
 import { definePlugin } from '../../core'
 import type { PluginContext } from '../../core/types'
 import {
@@ -465,8 +465,8 @@ export default definePlugin({
 
           // 基本信息
           const statusText = task.status === 'success' ? '✅ 成功' :
-                             task.status === 'failed' ? '❌ 失败' :
-                             task.status === 'processing' ? '⏳ 处理中' : '🕐 等待中'
+            task.status === 'failed' ? '❌ 失败' :
+              task.status === 'processing' ? '⏳ 处理中' : '🕐 等待中'
 
           const basicLines: string[] = []
           basicLines.push('━━━━━━━━━━━━━━')
@@ -633,6 +633,10 @@ function registerChannelCommand(
   const needsImageInput = channelTags.some((tag: string) =>
     tag.startsWith('img2')
   )
+  const needsVideoInput = channelTags.some((tag: string) =>
+    tag.startsWith('video2')
+  )
+  const needsMediaInput = needsImageInput || needsVideoInput
 
   // 注册渠道指令（使用 rest 参数捕获所有输入）
   // 注意：presets 参数仅用于初始 usage 显示，实际预设匹配在执行时实时查询
@@ -650,6 +654,9 @@ function registerChannelCommand(
   if (!existingOptions['image']) {
     channelCmd.option('image', '-i <url:string> 输入图片URL')
   }
+  if (!existingOptions['video']) {
+    channelCmd.option('video', '-v <url:string> 输入视频URL')
+  }
 
   // 设置用法说明和动作处理器
   channelCmd
@@ -664,7 +671,7 @@ function registerChannelCommand(
       }
 
       // 创建提取器
-      const extractor = new MessageExtractor(ctx, logger, state)
+      const extractor = new MessageExtractor(ctx, logger, state, config)
 
       // 从当前消息提取所有内容（图片、at、引用、文本）
       const messageText = await extractor.extractAll(session)
@@ -693,9 +700,13 @@ function registerChannelCommand(
       if (options?.image) {
         await extractor.fetchImage(options.image, 'input')
       }
+      // 如果命令行指定了视频 URL，也获取
+      if (options?.video) {
+        await extractor.fetchVideo(options.video, 'input')
+      }
 
-      // 如果渠道不需要图片输入（纯 text2xxx 类型），直接生成
-      if (!needsImageInput) {
+      // 如果渠道不需要媒体输入（纯 text2xxx 类型），直接生成
+      if (!needsMediaInput) {
         // 只要有提示词就可以生成
         if (state.prompts.length === 0 && state.files.length === 0) {
           return '请输入提示词'
@@ -703,7 +714,7 @@ function registerChannelCommand(
         return executeGenerateWithPresetCheck(ctx, session, channel, state, mediaLuna, config)
       }
 
-      // 以下是需要图片输入的渠道（img2xxx 类型）
+      // 以下是需要媒体输入的渠道（img2xxx/video2xxx 类型）
 
       // 判断是否直接触发
       if (state.files.length >= config.directTriggerImageCount) {
@@ -715,7 +726,7 @@ function registerChannelCommand(
       return enterCollectMode(ctx, session, channel, state, config, mediaLuna, logger)
     })
 
-  logger.debug(`Registered command: ${channel.name} (needsImageInput: ${needsImageInput}, ${presets.length} presets)`)
+  logger.debug(`Registered command: ${channel.name} (needsMediaInput: ${needsMediaInput}, ${presets.length} presets)`)
   return () => channelCmd.dispose()
 }
 
@@ -738,12 +749,14 @@ class MessageExtractor {
   private ctx: any
   private logger: any
   private state: CollectState
+  private config: KoishiCommandsConfig
   private result: ExtractResult
 
-  constructor(ctx: any, logger: any, state: CollectState) {
+  constructor(ctx: any, logger: any, state: CollectState, config: KoishiCommandsConfig) {
     this.ctx = ctx
     this.logger = logger
     this.state = state
+    this.config = config
     this.result = { images: 0, avatars: 0, failed: 0, skipped: 0, failedUrls: [] }
   }
 
@@ -774,6 +787,13 @@ class MessageExtractor {
     return this.extractText(session.elements)
   }
 
+  get stateInfo() {
+    return {
+      files: this.state.files.length,
+      prompts: this.state.prompts.length
+    }
+  }
+
   /**
    * 从 Session 只提取媒体内容（图片、at、引用），不提取文本
    * 顺序：引用图片 → 当前图片 → @头像（符合用户直觉）
@@ -792,6 +812,9 @@ class MessageExtractor {
 
     // 2. 提取当前消息的图片
     await this.extractImages(session.elements)
+
+    // 提取视频
+    await this.extractVideos(session.elements, session)
 
     // 3. 最后提取 @ 用户头像
     await this.extractAtAvatars(session)
@@ -825,6 +848,73 @@ class MessageExtractor {
           if (success) this.result.images++
         } else {
           this.logger.warn('Image element has no URL, attrs: %s', JSON.stringify(el.attrs))
+        }
+      }
+    }
+  }
+
+  /**
+   * 从元素数组中提取视频
+   */
+  async extractVideos(elements: any[], session?: Session): Promise<void> {
+    for (const el of elements) {
+      if (el.type === 'video') {
+        this.logger.info('Found video element. Full structure: %s', JSON.stringify(el, null, 2))
+
+        // 优先寻找 http/https 链接
+        let targetUrl = el.attrs?.url || el.attrs?.src
+
+        // 如果 url/src 是本地路径，尝试寻找其他可能的 HTTP 属性
+        // 某些适配器可能把 http 链接放在其他字段，或者 src 是本地 file 是远程
+        if (targetUrl && !targetUrl.startsWith('http')) {
+          // 尝试遍历 attrs 寻找 http 链接
+          for (const [key, val] of Object.entries(el.attrs || {})) {
+            if (typeof val === 'string' && val.startsWith('http')) {
+              this.logger.info('Found alternative HTTP URL in attr %s: %s', key, val)
+              targetUrl = val
+              break
+            }
+          }
+        }
+
+        // NapCat/OneBot 修复：如果开启了配置且 platform 是 onebot/qq，尝试使用 get_file
+        if (this.config.useNapCatFileApi && session?.bot?.platform && ['onebot', 'qq', 'red'].includes(session.bot.platform)) {
+          // 检查是否有 file 属性 (NapCat 通常会有 file 属性作为 file_id)
+          const fileId = el.attrs?.file || el.attrs?.file_id
+
+          // 如果当前没有 targetUrl 或者 targetUrl 是本地路径，且有 fileId，则尝试获取
+          // 本地路径通常包含 "Video" 或 "Tencent Files" 或没有协议头
+          const isLocalPath = !targetUrl || !targetUrl.startsWith('http')
+
+          if (isLocalPath && fileId && session.onebot?._request) {
+            try {
+              this.logger.info(`Attempting to fetch real URL for video fileId: ${fileId} using NapCat API`)
+              const {data}  = await session.onebot._request("get_file", { file: fileId })
+              // NapCat get_file 返回 { file_name, md5, size, url, ... }
+              if (data && data.url && (data.url.startsWith("http://") || data.url.startsWith("https://"))) {
+                this.logger.info(`Successfully retrieved NapCat video URL: ${data.url}`)
+                targetUrl = data.url
+              } else {
+                this.logger.warn(`NapCat API returned no URL for fileId: ${fileId}. Trying to use get_group_file_url.`)
+                const {data}  = await session.onebot._request("get_group_file_url", { file: fileId, group_id: session.guildId})
+                if (data && data.url && (data.url.startsWith("http://") || data.url.startsWith("https://"))) {
+                  this.logger.info(`Successfully retrieved NapCat video URL: ${data.url}`)
+                  targetUrl = data.url
+                } else {
+                  this.logger.warn(`get_group_file_url returned no URL for fileId: ${fileId}.`)
+                }
+              }
+            } catch (e) {
+              this.logger.warn(`Failed to call NapCat get_file for ${fileId}: ${e}`)
+            }
+          }
+        }
+
+        if (targetUrl) {
+          this.logger.info('Attempting to fetch video from: %s', targetUrl)
+          await this.fetchVideo(targetUrl, 'input')
+        } else {
+          this.logger.warn('No URL found for video element')
         }
       }
     }
@@ -870,60 +960,27 @@ class MessageExtractor {
     if (session.elements) {
       for (const el of session.elements) {
         if (el.type === 'quote' && el.children && el.children.length > 0) {
-          this.logger.debug('Found quote element with %d children', el.children.length)
-          await this.extractImagesFromElements(el.children, 'quote')
+          for (const child of el.children) {
+            if (child.type === 'img' || child.type === 'image') {
+              await this.fetchImage(child.attrs?.src || child.attrs?.url, 'quote')
+            }
+          }
         }
       }
     }
 
-    // 2. 从 session.quote 中提取图片（被引用消息的内容）
+    // 2. 从 session.quote 中提取图片和视频（被引用消息的内容）
     const quote = session.quote as any
-    if (quote?.elements && Array.isArray(quote.elements)) {
-      this.logger.debug('Found session.quote with %d elements', quote.elements.length)
-      await this.extractImagesFromElements(quote.elements, 'quote')
-    } else if (quote?.content) {
-      // OneBot 某些情况下可能只有 content 字符串
-      this.logger.debug('Quote has content but no elements: %s', quote.content)
-      // 尝试从 content 中解析图片 URL（CQ码格式）
-      await this.extractFromCQCode(quote.content, 'quote')
-    }
-  }
-
-  /**
-   * 从元素数组中提取所有图片（通用方法）
-   */
-  private async extractImagesFromElements(elements: any[], prefix: string): Promise<void> {
-    for (const el of elements) {
-      if (el.type === 'img' || el.type === 'image') {
-        const imageUrl = el.attrs?.src || el.attrs?.url || el.attrs?.file
-        if (imageUrl) {
-          const success = await this.fetchImage(imageUrl, prefix)
-          if (success) this.result.images++
+    if (quote?.elements) {
+      this.logger.debug('Extracting from session.quote.elements')
+      for (const el of quote.elements) {
+        if (el.type === 'img' || el.type === 'image') {
+          await this.fetchImage(el.attrs?.src || el.attrs?.url, 'quote')
         }
       }
-      // 递归处理嵌套元素
-      if (el.children && Array.isArray(el.children) && el.children.length > 0) {
-        await this.extractImagesFromElements(el.children, prefix)
-      }
-    }
-  }
-
-  /**
-   * 从 CQ 码字符串中提取图片 URL
-   * 格式：[CQ:image,file=xxx,url=xxx]
-   */
-  private async extractFromCQCode(content: string, prefix: string): Promise<void> {
-    // 匹配 [CQ:image,...] 格式
-    const cqImageRegex = /\[CQ:image[^\]]*(?:url|file)=([^\],\]]+)[^\]]*\]/gi
-    let match: RegExpExecArray | null
-
-    while ((match = cqImageRegex.exec(content)) !== null) {
-      const url = match[1]
-      if (url) {
-        this.logger.debug('Extracted image URL from CQ code: %s', url)
-        const success = await this.fetchImage(url, prefix)
-        if (success) this.result.images++
-      }
+    } else if (quote?.content) {
+      // 有些平台可能只有 content 字符串，尝试解析
+      this.logger.debug('Quote has content but no elements: %s', quote.content)
     }
   }
 
@@ -989,51 +1046,6 @@ class MessageExtractor {
       this.result.failedUrls.push(url.substring(0, 100))
       return false
     }
-  }
-
-  /**
-   * 检测图片 MIME 类型（通过魔数）
-   */
-  private detectMimeType(buffer: Buffer): string | null {
-    if (buffer.length < 4) return null
-
-    // PNG: 89 50 4E 47
-    if (buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4E && buffer[3] === 0x47) {
-      return 'image/png'
-    }
-    // JPEG: FF D8 FF
-    if (buffer[0] === 0xFF && buffer[1] === 0xD8 && buffer[2] === 0xFF) {
-      return 'image/jpeg'
-    }
-    // GIF: 47 49 46 38
-    if (buffer[0] === 0x47 && buffer[1] === 0x49 && buffer[2] === 0x46 && buffer[3] === 0x38) {
-      return 'image/gif'
-    }
-    // WebP: 52 49 46 46 ... 57 45 42 50
-    if (buffer[0] === 0x52 && buffer[1] === 0x49 && buffer[2] === 0x46 && buffer[3] === 0x46 &&
-        buffer.length > 11 && buffer[8] === 0x57 && buffer[9] === 0x45 && buffer[10] === 0x42 && buffer[11] === 0x50) {
-      return 'image/webp'
-    }
-    // BMP: 42 4D
-    if (buffer[0] === 0x42 && buffer[1] === 0x4D) {
-      return 'image/bmp'
-    }
-
-    return null
-  }
-
-  /**
-   * 根据 MIME 类型获取扩展名
-   */
-  private getExtFromMime(mime: string): string {
-    const map: Record<string, string> = {
-      'image/png': 'png',
-      'image/jpeg': 'jpg',
-      'image/gif': 'gif',
-      'image/webp': 'webp',
-      'image/bmp': 'bmp'
-    }
-    return map[mime] || 'png'
   }
 
   /**
@@ -1125,12 +1137,15 @@ async function enterCollectMode(
   }
 
   // 发送收集模式提示
+  const imgCount = state.files.filter(f => f.mime.startsWith('image/')).length
+  const videoCount = state.files.filter(f => f.mime.startsWith('video/')).length
+  
   const hintMsgIds = await session.send(
-    `已进入收集模式，请继续发送图片/@用户/文字\n发送「开始」触发生成，发送「取消」退出\n当前已收集: ${state.files.length} 张图片`
+    `已进入收集模式，请继续发送图片/视频/@用户/文字\n发送「开始」触发生成，发送「取消」退出\n当前已收集: ${imgCount} 张图片, ${videoCount} 个视频`
   )
 
   const timeoutMs = config.collectTimeout * 1000
-  const extractor = new MessageExtractor(ctx, logger, state)
+  const extractor = new MessageExtractor(ctx, logger, state, config)
 
   // 使用 Promise 来等待收集完成
   return new Promise<string>((resolve) => {
@@ -1155,6 +1170,13 @@ async function enterCollectMode(
       if (sess.channelId !== session.channelId) return next()
       // 关键：只处理同一 bot 的消息（多 bot 场景下避免重复处理）
       if (sess.selfId !== session.selfId) return next()
+
+      // DEBUG: 打印收到的消息结构
+      logger.info('Collection middleware received: %s', JSON.stringify({
+        content: sess.content,
+        elements: sess.elements,
+        messageId: sess.messageId
+      }, null, 2))
 
       // 检查消息是否已处理过（防止重复处理）
       const messageId = sess.messageId
@@ -1201,12 +1223,32 @@ async function enterCollectMode(
         return
       }
 
+      // 记录当前文件数量
+      const prevFileCount = state.files.length
+
       // 从消息中提取所有内容
       extractor.resetResult()  // 重置统计
       const text = await extractor.extractAll(sess)
       extractor.addPrompt(text)
 
-      // 只在有图片收集失败时反馈，避免刷屏
+      const { files, prompts } = state
+
+      // 重新计算各类数量
+      const imgCount = files.filter(f => f.mime.startsWith('image/')).length
+      const videoCount = files.filter(f => f.mime.startsWith('video/')).length
+      const promptCount = prompts.length
+
+      // 检查是否有主要变化
+      const hasNewFiles = files.length > prevFileCount
+      const hasNewText = !!text
+
+      // 反馈给用户已收集的数量
+      if (hasNewFiles || hasNewText) {
+        logger.debug(`Collected update: ${imgCount} imgs, ${videoCount} videos, ${promptCount} prompts`)
+        await sess.send(`已收集: ${imgCount} 张图片, ${videoCount} 个视频, ${promptCount} 条提示词`)
+      }
+
+      // 只在有图片收集失败时反馈
       const result = extractor.getResult()
       if (result.failed > 0) {
         sess.send(`⚠️ ${result.failed}张图片收集失败，当前共${state.files.length}张`).catch(() => {})

@@ -18,6 +18,8 @@ export interface KoishiCommandsConfig {
   linkModeTags: string
   /** 是否输出文本内容 */
   outputTextContent: boolean
+  /** 是否使用 NapCat/OneBot 的 get_file API 获取视频链接（修复 QQ 视频本地路径问题） */
+  useNapCatFileApi: boolean
 }
 
 /** 默认配置 */
@@ -28,7 +30,8 @@ export const defaultKoishiCommandsConfig: KoishiCommandsConfig = {
   directTriggerImageCount: 2,
   linkModeEnabled: false,
   linkModeTags: 'nsfw',
-  outputTextContent: false
+  outputTextContent: false,
+  useNapCatFileApi: false
 }
 
 /** 配置字段定义 */
@@ -81,5 +84,12 @@ export const koishiCommandsConfigFields: ConfigField[] = [
     type: 'boolean',
     default: false,
     description: '是否输出 API 返回的文本内容（如思考过程、模型回复等）'
+  },
+  {
+    key: 'useNapCatFileApi',
+    label: '使用 NapCat 文件 API',
+    type: 'boolean',
+    default: false,
+    description: '针对 QQ 平台（NapCat/OneBot）：尝试调用 internal.get_file 获取视频真实链接。仅在视频无法正常获取时开启。'
   }
 ]

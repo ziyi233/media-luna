@@ -86,7 +86,9 @@
             <!-- 已上传的图片列表 -->
             <div class="upload-list" v-if="fileList.length > 0">
               <div v-for="(file, index) in fileList" :key="file.uid" class="upload-item">
-                <img :src="file.url" class="upload-thumb" />
+                <img v-if="file.raw?.type.startsWith('image/')" :src="file.url" class="upload-thumb" />
+                <video v-else-if="file.raw?.type.startsWith('video/')" :src="file.url" class="upload-thumb" />
+                <div v-else class="upload-thumb unknown-file">❓</div>
                 <div class="upload-overlay" @click="removeFile(index)">
                   <span>🗑️</span>
                 </div>
@@ -102,7 +104,7 @@
               <input
                 ref="fileInput"
                 type="file"
-                accept="image/*"
+                accept="image/*,video/*"
                 multiple
                 style="display: none"
                 @change="handleFileSelect"
@@ -131,6 +133,11 @@
           </button>
         </div>
       </div>
+    </div>
+    <div style="display:none">
+       <style>
+         .upload-thumb { object-fit: cover; }
+       </style>
     </div>
 
     <!-- 中间区域 -->
@@ -665,7 +672,7 @@ const handleFileSelect = async (e: Event) => {
 const handleDrop = async (e: DragEvent) => {
   const files = e.dataTransfer?.files
   if (!files || files.length === 0) return
-  await addFiles(Array.from(files).filter(f => f.type.startsWith('image/')))
+  await addFiles(Array.from(files).filter(f => f.type.startsWith('image/') || f.type.startsWith('video/')))
 }
 
 // 添加文件
@@ -680,8 +687,9 @@ const addFiles = async (files: File[]) => {
 
     try {
       const base64 = await fileToBase64(file)
+      const isVideo = file.type.startsWith('video/')
       uploadedFiles.value.push({
-        type: 'image',
+        type: isVideo ? 'video' : 'image',
         base64,
         mimeType: file.type,
         filename: file.name

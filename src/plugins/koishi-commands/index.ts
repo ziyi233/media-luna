@@ -661,7 +661,7 @@ function registerChannelCommand(
   // 设置用法说明和动作处理器
   channelCmd
     .usage(`用法: ${commandName} [预设名] <提示词>\n可用预设: ${presets.map((p: any) => p.name).join(', ') || '无'}`)
-    .action(async ({ session, options }: { session: Session; options: any }) => {
+    .action(async ({ session, options }: { session: Session; options: any }, ...rest: string[]) => {
       // 初始化收集状态（预设名稍后解析）
       const state: CollectState = {
         files: [],
@@ -673,27 +673,16 @@ function registerChannelCommand(
       // 创建提取器
       const extractor = new MessageExtractor(ctx, logger, state, config)
 
-      // 从当前消息提取所有内容（图片、at、引用、文本）
-      const messageText = await extractor.extractAll(session)
+      // 从当前消息提取媒体内容（图片、at、引用），不提取文本
+      // 文本由 Koishi 解析器通过 rest 参数提供，已正确去除命令名
+      await extractor.extractMedia(session)
 
-      // 使用从消息元素中提取的纯文本作为提示词
-      // 注意：不使用 rest 参数，因为它可能包含未解析的 HTML 标签（如 <img>）
-      // messageText 是通过 h.select(elements, 'text') 正确提取的纯文本内容
-      //
-      // 重要：session.elements 包含原始完整消息，包括命令名
-      // 需要去除开头的命令名（channel.name），只保留命令后的内容
-      if (messageText.trim()) {
-        let promptText = messageText.trim()
-        // 检查是否以命令名开头（不区分大小写）
-        const cmdName = channel.name.toLowerCase()
-        const promptLower = promptText.toLowerCase()
-        if (promptLower.startsWith(cmdName)) {
-          // 去除命令名和后面的空格
-          promptText = promptText.substring(cmdName.length).trimStart()
-        }
-        if (promptText) {
-          state.prompts.push(promptText)
-        }
+      // 使用 Koishi 解析器提供的 rest 参数作为提示词
+      // rest 参数已经正确去除了命令名（无论是 medialuna.渠道名 还是 渠道名）
+      // 这避免了手动解析时可能出现的问题
+      const promptText = rest.join(' ').trim()
+      if (promptText) {
+        state.prompts.push(promptText)
       }
 
       // 如果命令行指定了图片 URL，也获取

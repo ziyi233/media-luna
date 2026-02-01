@@ -1,10 +1,10 @@
-// Gemini 连接器
+// Vertex AI 连接器
 
 import { Context } from 'koishi'
 import type { ConnectorDefinition, FileData, OutputAsset, ConnectorRequestLog } from '../../core'
 import { connectorFields, connectorCardFields } from './config'
 
-/** Gemini 生成函数 */
+/** Vertex AI 生成函数 */
 async function generate(
   ctx: Context,
   config: Record<string, any>,
@@ -13,15 +13,8 @@ async function generate(
 ): Promise<OutputAsset[]> {
   const logger = ctx.logger('media-luna')
 
-  // 调试：打印原始配置中的 filterThoughtImages
-  logger.debug('[gemini] config.filterThoughtImages raw value: %o (type: %s)',
-    config.filterThoughtImages,
-    typeof config.filterThoughtImages
-  )
-
-  // 从 config 中获取配置（默认值由前端字段定义提供，保存时已填充）
   const {
-    apiUrl,
+    apiEndpoint,
     apiKey,
     model,
     numberOfImages,
@@ -39,37 +32,31 @@ async function generate(
     timeout
   } = config
 
-  // 调试：打印解构后的值
-  logger.debug('[gemini] filterThoughtImages after destructure: %o', filterThoughtImages)
-
+  if (!apiEndpoint) {
+    throw new Error('API Endpoint 未配置')
+  }
+  if (!apiKey) {
+    throw new Error('API Key 未配置')
+  }
   if (!model) {
     throw new Error('模型未配置')
   }
 
-  // 构建完整 API Endpoint（兼容旧数据，提供后备默认值）
-  const baseUrl = (apiUrl || 'https://generativelanguage.googleapis.com').replace(/\/$/, '')
-  // 如果用户填写了带 /v1beta 的路径，则直接使用
-  // 否则根据模型名称自动拼接路径
-  const version = 'v1beta'
-  const endpointBase = baseUrl.includes(`/${version}`)
-    ? baseUrl
-    : `${baseUrl}/${version}`
-
-  const endpoint = `${endpointBase}/models/${model}:generateContent?key=${apiKey}`
+  // 构建端点 URL
+  // 格式: https://${API_ENDPOINT}/v1/publishers/google/models/${MODEL_ID}:generateContent?key=${API_KEY}
+  const baseEndpoint = apiEndpoint.replace(/^https?:\/\//, '').replace(/\/$/, '')
+  const endpoint = `https://${baseEndpoint}/v1/publishers/google/models/${model}:generateContent?key=${apiKey}`
 
   // 构建请求体
   const parts: any[] = []
 
-  // 添加输入图片（Gemini 格式：inlineData）
+  // 添加输入图片
   for (const file of files) {
     if (file.data) {
-      // 将 ArrayBuffer 转换为 base64
       let base64Data: string
       if (typeof file.data === 'string') {
-        // 已经是 base64
         base64Data = file.data
       } else {
-        // ArrayBuffer 转 base64
         const buffer = Buffer.from(file.data)
         base64Data = buffer.toString('base64')
       }
@@ -84,26 +71,19 @@ async function generate(
   }
 
   // 添加文本提示
-  parts.push({
-    text: prompt
-  })
+  parts.push({ text: prompt })
 
   const requestBody: any = {
-    contents: [
-      {
-        role: 'user',
-        parts
-      }
-    ],
+    contents: [{ role: 'user', parts }],
     generationConfig: {}
   }
 
-  // 仅在启用时添加 responseModalities（根据文档使用 TEXT + IMAGE）
+  // responseModalities
   if (forceImageOutput) {
     requestBody.generationConfig.responseModalities = ['TEXT', 'IMAGE']
   }
 
-  // 仅在配置了值时才添加 imageConfig
+  // imageConfig
   const imageConfig: Record<string, any> = {}
   if (aspectRatio) imageConfig.aspectRatio = aspectRatio
   if (imageSize) imageConfig.imageSize = imageSize
@@ -115,29 +95,25 @@ async function generate(
     requestBody.generationConfig.imageConfig = imageConfig
   }
 
-  // 如果需要多张图，添加 candidateCount（注意：部分模型可能不支持）
+  // candidateCount
   if (numberOfImages !== undefined && numberOfImages !== null && numberOfImages > 1) {
     requestBody.generationConfig.candidateCount = Number(numberOfImages)
   }
 
-  // 添加思考配置
+  // thinkingConfig
   if (thinkingLevel || includeThoughts) {
     const thinkingConfig: Record<string, any> = {}
-    if (thinkingLevel) {
-      thinkingConfig.thinkingLevel = thinkingLevel
-    }
-    if (includeThoughts) {
-      thinkingConfig.includeThoughts = true
-    }
+    if (thinkingLevel) thinkingConfig.thinkingLevel = thinkingLevel
+    if (includeThoughts) thinkingConfig.includeThoughts = true
     requestBody.generationConfig.thinkingConfig = thinkingConfig
   }
 
-  // 启用谷歌搜索
+  // Google Search
   if (enableGoogleSearch) {
     requestBody.tools = [{ googleSearch: {} }]
   }
 
-  // 添加安全过滤设置
+  // safetySettings
   if (safetyLevel) {
     const categories = [
       'HARM_CATEGORY_HATE_SPEECH',
@@ -153,16 +129,14 @@ async function generate(
 
   try {
     const response = await ctx.http.post(endpoint, requestBody, {
-      headers: {
-        'Content-Type': 'application/json'
-      },
+      headers: { 'Content-Type': 'application/json' },
       timeout: (timeout || 600) * 1000
     })
 
     const assets: OutputAsset[] = []
     const candidates = response.candidates || []
 
-    // 调试：统计 parts 信息
+    // 调试统计
     let totalParts = 0
     let thoughtParts = 0
     let imageParts = 0
@@ -175,14 +149,13 @@ async function generate(
         if (part.thought) thoughtParts++
         if (part.inlineData) imageParts++
 
-        // 过滤思考过程（thought: true 标记的 parts）
-        // 兼容旧数据：filterThoughtImages 未设置时默认为 true
+        // 过滤思考过程
         const shouldFilterThought = (filterThoughtImages ?? true) && part.thought
         if (shouldFilterThought) {
           continue
         }
 
-        // 处理内联图片数据
+        // 处理图片
         if (part.inlineData) {
           const mimeType = part.inlineData.mimeType || 'image/png'
           const base64Data = part.inlineData.data
@@ -199,7 +172,7 @@ async function generate(
           })
         }
 
-        // 处理文本内容
+        // 处理文本
         if (part.text) {
           assets.push({
             kind: 'text',
@@ -213,7 +186,7 @@ async function generate(
       }
     }
 
-    logger.debug('[gemini] Response stats: totalParts=%d, thoughtParts=%d, imageParts=%d, assets=%d',
+    logger.debug('[vertex-ai] Response: totalParts=%d, thoughtParts=%d, imageParts=%d, assets=%d',
       totalParts, thoughtParts, imageParts, assets.length
     )
 
@@ -221,12 +194,11 @@ async function generate(
       throw new Error('No content generated in response')
     }
 
-    // 检查是否只有文字输出（无图片/视频/音频）
+    // 检查是否只有文字输出
     const hasMedia = assets.some(a => a.kind === 'image' || a.kind === 'video' || a.kind === 'audio')
     const hasTextOnly = !hasMedia && assets.some(a => a.kind === 'text')
 
     if (hasTextOnly && !textOnlyAsSuccess) {
-      // 纯文字输出且配置为不视为成功，抛出错误（不扣费）
       const textContent = assets
         .filter(a => a.kind === 'text')
         .map(a => a.content)
@@ -238,34 +210,27 @@ async function generate(
 
   } catch (error) {
     if (error instanceof Error) {
-      throw new Error(`Gemini API error: ${error.message}`)
+      throw new Error(`Vertex AI error: ${error.message}`)
     }
     throw error
   }
 }
 
-/** Gemini 连接器定义 */
-export const GeminiConnector: ConnectorDefinition = {
-  id: 'gemini-v3',
-  name: 'Google Gemini 3',
-  description: 'Google Gemini 原生API，支持图像生成',
-  icon: 'gemini',
+/** Vertex AI 连接器定义 */
+export const VertexAIConnector: ConnectorDefinition = {
+  id: 'vertex-ai',
+  name: 'Google Vertex AI',
+  description: 'Google Vertex AI API，支持 Gemini 模型图像生成',
+  icon: 'vertexai',
   supportedTypes: ['image'],
   fields: connectorFields,
   cardFields: connectorCardFields,
-  defaultTags: ['text2img', 'img2img', 'text2video', 'img2video', 'text2audio'],
+  defaultTags: ['text2img', 'img2img'],
   generate,
 
   /** 获取请求日志 */
   getRequestLog(config, files, prompt): ConnectorRequestLog {
-    const {
-      apiUrl,
-      model,
-      numberOfImages,
-      aspectRatio,
-      imageSize,
-      enableGoogleSearch
-    } = config
+    const { apiEndpoint, model, numberOfImages, aspectRatio, imageSize, enableGoogleSearch } = config
 
     const parameters: Record<string, any> = {}
     if (numberOfImages !== undefined && numberOfImages !== null && numberOfImages > 1) {
@@ -276,7 +241,7 @@ export const GeminiConnector: ConnectorDefinition = {
     if (enableGoogleSearch) parameters.googleSearch = true
 
     return {
-      endpoint: apiUrl?.split('?')[0] || 'generativelanguage.googleapis.com',
+      endpoint: apiEndpoint,
       model,
       prompt,
       fileCount: files.length,

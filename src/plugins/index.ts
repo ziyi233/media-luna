@@ -18,6 +18,7 @@ import sdWebuiConnectorPlugin from './connector-sd-webui'
 import fluxConnectorPlugin from './connector-flux'
 import chatApiConnectorPlugin from './connector-chat-api'
 import geminiConnectorPlugin from './connector-gemini'
+import vertexAIConnectorPlugin from './connector-vertex-ai'
 import midjourneyConnectorPlugin from './connector-midjourney'
 import stabilityConnectorPlugin from './connector-stability'
 import sunoConnectorPlugin from './connector-suno'
@@ -51,6 +52,7 @@ export const builtinPlugins: PluginDefinition[] = [
   fluxConnectorPlugin,
   chatApiConnectorPlugin,
   geminiConnectorPlugin,
+  vertexAIConnectorPlugin,
   midjourneyConnectorPlugin,
   stabilityConnectorPlugin,
   sunoConnectorPlugin,
@@ -83,6 +85,7 @@ export {
   fluxConnectorPlugin,
   chatApiConnectorPlugin,
   geminiConnectorPlugin,
+  vertexAIConnectorPlugin,
   midjourneyConnectorPlugin,
   stabilityConnectorPlugin,
   sunoConnectorPlugin,

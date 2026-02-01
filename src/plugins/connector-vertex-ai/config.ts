@@ -1,24 +1,24 @@
-// Gemini 连接器配置
+// Vertex AI 连接器配置
 
 import type { ConnectorField, CardDisplayField } from '../../core'
 
-/** Gemini 配置字段 */
+/** Vertex AI 配置字段 */
 export const connectorFields: ConnectorField[] = [
   {
-    key: 'apiUrl',
-    label: 'API URL',
+    key: 'apiEndpoint',
+    label: 'API Endpoint',
     type: 'text',
     required: true,
-    default: 'https://generativelanguage.googleapis.com',
-    placeholder: 'https://generativelanguage.googleapis.com',
-    description: 'API 基础地址，用于反向代理或自定义端点'
+    default: 'aiplatform.googleapis.com',
+    placeholder: 'aiplatform.googleapis.com',
+    description: 'Vertex AI API 端点'
   },
   {
     key: 'apiKey',
     label: 'API Key',
     type: 'password',
     required: true,
-    description: 'Google AI Studio API Key'
+    description: 'Google Cloud API Key（需绑定服务账号）'
   },
   {
     key: 'model',
@@ -46,6 +46,7 @@ export const connectorFields: ConnectorField[] = [
     label: '图片尺寸',
     type: 'select',
     options: [
+      { label: '不设置', value: '' },
       { label: '1024x1024 (1K)', value: '1K' },
       { label: '2048x2048 (2K)', value: '2K' },
       { label: '4096x4096 (4K)', value: '4K' }
@@ -57,18 +58,18 @@ export const connectorFields: ConnectorField[] = [
     label: '输出格式',
     type: 'select',
     options: [
-      { label: '不设置（默认 JPEG）', value: '' },
+      { label: '不设置', value: '' },
       { label: 'JPEG', value: 'image/jpeg' },
       { label: 'PNG', value: 'image/png' }
     ],
-    description: '生成图片的输出格式（部分 API 端点可能不支持此参数）'
+    description: '生成图片的输出格式'
   },
   {
     key: 'forceImageOutput',
     label: '强制图片输出',
     type: 'boolean',
-    default: false,
-    description: '启用后添加 responseModalities: ["TEXT", "IMAGE"] 参数，强制模型输出图片'
+    default: true,
+    description: '启用后添加 responseModalities: ["TEXT", "IMAGE"] 参数'
   },
   {
     key: 'enableGoogleSearch',
@@ -88,7 +89,7 @@ export const connectorFields: ConnectorField[] = [
       { label: '低 (low)', value: 'low' },
       { label: '最小 (minimal) - 仅 Flash', value: 'minimal' }
     ],
-    description: '控制模型思考的深度，medium 和 minimal 仅支持 Flash 模型'
+    description: '控制模型思考的深度'
   },
   {
     key: 'includeThoughts',
@@ -102,14 +103,14 @@ export const connectorFields: ConnectorField[] = [
     label: '过滤思考图片',
     type: 'boolean',
     default: true,
-    description: '高分辨率请求时，API 会返回思考过程的临时图片，启用后自动过滤这些图片，只保留最终结果'
+    description: '自动过滤思考过程的临时图片，只保留最终结果'
   },
   {
     key: 'textOnlyAsSuccess',
     label: '纯文字视为成功',
     type: 'boolean',
     default: false,
-    description: '当模型只返回文字（无图片）时，是否视为生成成功。关闭则会报错（不扣费），开启则正常返回文字内容（扣费）'
+    description: '当模型只返回文字（无图片）时，是否视为生成成功'
   },
   {
     key: 'safetyLevel',
@@ -122,7 +123,7 @@ export const connectorFields: ConnectorField[] = [
       { label: '中等及以上 (BLOCK_MEDIUM_AND_ABOVE)', value: 'BLOCK_MEDIUM_AND_ABOVE' },
       { label: '低风险及以上 (BLOCK_LOW_AND_ABOVE)', value: 'BLOCK_LOW_AND_ABOVE' }
     ],
-    description: '内容安全过滤级别，不设置则使用API默认值'
+    description: '内容安全过滤级别'
   },
   {
     key: 'personGeneration',
@@ -134,7 +135,7 @@ export const connectorFields: ConnectorField[] = [
       { label: '仅成人 (ALLOW_ADULT)', value: 'ALLOW_ADULT' },
       { label: '不允许 (DONT_ALLOW)', value: 'DONT_ALLOW' }
     ],
-    description: '控制是否允许生成人物图片，不设置则使用API默认值'
+    description: '控制是否允许生成人物图片'
   },
   {
     key: 'timeout',

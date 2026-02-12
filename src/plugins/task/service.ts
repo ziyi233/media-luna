@@ -21,6 +21,19 @@ export interface TaskData {
   duration: number | null
 }
 
+/** 任务列表项（精简，不含 middlewareLogs） */
+export interface TaskListItem {
+  id: number
+  uid: number | null
+  channelId: number
+  requestSnapshot: GenerationRequest
+  responseSnapshot: OutputAsset[] | null
+  status: TaskStatus
+  startTime: Date
+  endTime: Date | null
+  duration: number | null
+}
+
 /** 任务查询选项 */
 export interface TaskQueryOptions {
   uid?: number
@@ -44,7 +57,7 @@ export class TaskService {
     this._ctx = ctx
   }
 
-  /** 将数据库记录转换为 TaskData */
+  /** 将数据库记录转换为完整 TaskData（用于单条详情） */
   private _toData(record: MediaLunaTask): TaskData {
     return {
       id: record.id,
@@ -58,6 +71,56 @@ export class TaskService {
       endTime: record.endTime,
       duration: record.duration
     }
+  }
+
+  /** 将数据库记录转换为列表项（跳过 middlewareLogs 解析） */
+  private _toListItem(record: MediaLunaTask): TaskListItem {
+    return {
+      id: record.id,
+      uid: record.uid,
+      channelId: record.channelId,
+      requestSnapshot: JSON.parse(record.requestSnapshot || '{}'),
+      responseSnapshot: record.responseSnapshot ? JSON.parse(record.responseSnapshot) : null,
+      status: record.status as TaskStatus,
+      startTime: record.startTime,
+      endTime: record.endTime,
+      duration: record.duration
+    }
+  }
+
+  /** 构建查询条件对象（用于 database.eval / database.remove 等） */
+  private _buildQueryObject(options: Omit<TaskQueryOptions, 'limit' | 'offset' | 'mediaType'>): Record<string, any> {
+    const query: Record<string, any> = {}
+    if (options.uid !== undefined && options.uid !== null) {
+      query.uid = options.uid
+    }
+    if (options.channelId !== undefined && options.channelId !== null) {
+      query.channelId = options.channelId
+    }
+    if (options.status) {
+      query.status = options.status
+    }
+    if (options.startDate) {
+      query.startTime = { $gte: options.startDate }
+    }
+    return query
+  }
+
+  /** 为 selection 应用 where 条件 */
+  private _applyWhere(selection: any, options: Omit<TaskQueryOptions, 'limit' | 'offset' | 'mediaType'>): any {
+    if (options.uid !== undefined && options.uid !== null) {
+      selection = selection.where({ uid: options.uid })
+    }
+    if (options.channelId !== undefined && options.channelId !== null) {
+      selection = selection.where({ channelId: options.channelId })
+    }
+    if (options.status) {
+      selection = selection.where({ status: options.status })
+    }
+    if (options.startDate) {
+      selection = selection.where((row: any) => $.gte(row.startTime, options.startDate!))
+    }
+    return selection
   }
 
   /** 创建任务 */
@@ -126,34 +189,21 @@ export class TaskService {
     return this.getById(id)
   }
 
-  /** 根据 ID 获取任务 */
+  /** 根据 ID 获取任务（完整数据含 middlewareLogs） */
   async getById(id: number): Promise<TaskData | null> {
     const records = await this._ctx.database.get('medialuna_task', { id })
     return records.length > 0 ? this._toData(records[0]) : null
   }
 
-  /** 查询任务列表 */
-  async query(options: TaskQueryOptions = {}): Promise<TaskData[]> {
+  /** 查询任务列表（返回精简数据） */
+  async query(options: TaskQueryOptions = {}): Promise<TaskListItem[]> {
     let selection = this._ctx.database.select('medialuna_task')
-
-    if (options.uid !== undefined && options.uid !== null) {
-      selection = selection.where({ uid: options.uid })
-    }
-    if (options.channelId !== undefined && options.channelId !== null) {
-      selection = selection.where({ channelId: options.channelId })
-    }
-    if (options.status) {
-      selection = selection.where({ status: options.status })
-    }
-    if (options.startDate) {
-      selection = selection.where(row => $.gte(row.startTime, options.startDate!))
-    }
+    selection = this._applyWhere(selection, options)
 
     // 如果有 mediaType 筛选，需要在内存中过滤（因为 responseSnapshot 是 JSON 字段）
     if (options.mediaType) {
-      // 获取更多记录以便过滤后仍有足够结果
       const targetLimit = options.limit ?? 100
-      const fetchLimit = targetLimit * 3  // 获取 3 倍数量以补偿过滤损耗
+      const fetchLimit = targetLimit * 3
 
       const records = await selection
         .orderBy('id', 'desc')
@@ -161,13 +211,12 @@ export class TaskService {
         .offset(options.offset ?? 0)
         .execute()
 
-      // 在内存中过滤
-      const filtered: TaskData[] = []
+      const filtered: TaskListItem[] = []
       for (const r of records) {
-        const data = this._toData(r)
-        // 检查 responseSnapshot 是否包含指定类型的媒体
-        if (data.responseSnapshot?.some(asset => asset.kind === options.mediaType)) {
-          filtered.push(data)
+        // 只解析 responseSnapshot 用于过滤，避免解析 requestSnapshot
+        const responseSnapshot: OutputAsset[] | null = r.responseSnapshot ? JSON.parse(r.responseSnapshot) : null
+        if (responseSnapshot?.some(asset => asset.kind === options.mediaType)) {
+          filtered.push(this._toListItem(r))
           if (filtered.length >= targetLimit) break
         }
       }
@@ -180,89 +229,67 @@ export class TaskService {
       .offset(options.offset ?? 0)
       .execute()
 
-    return records.map(r => this._toData(r))
+    return records.map(r => this._toListItem(r))
   }
 
   /** 获取用户最近的任务 */
-  async getRecentByUid(uid: number, limit: number = 10): Promise<TaskData[]> {
+  async getRecentByUid(uid: number, limit: number = 10): Promise<TaskListItem[]> {
     return this.query({ uid, limit })
   }
 
-  /** 统计任务数量 */
+  /** 统计任务数量（使用数据库聚合，不加载全部记录） */
   async count(options: Omit<TaskQueryOptions, 'limit' | 'offset'> = {}): Promise<number> {
-    let selection = this._ctx.database.select('medialuna_task')
-
-    if (options.uid !== undefined && options.uid !== null) {
-      selection = selection.where({ uid: options.uid })
-    }
-    if (options.channelId !== undefined && options.channelId !== null) {
-      selection = selection.where({ channelId: options.channelId })
-    }
-    if (options.status) {
-      selection = selection.where({ status: options.status })
-    }
-    if (options.startDate) {
-      selection = selection.where(row => $.gte(row.startTime, options.startDate!))
-    }
-
-    // 如果有 mediaType 筛选，需要在内存中过滤
+    // 如果有 mediaType 筛选，必须在内存中过滤
     if (options.mediaType) {
-      const records = await selection.execute()
+      const query = this._buildQueryObject(options)
+      // 只取 responseSnapshot 字段减少传输量
+      const records = await this._ctx.database.get('medialuna_task', query)
       let count = 0
       for (const r of records) {
-        const data = this._toData(r)
-        if (data.responseSnapshot?.some(asset => asset.kind === options.mediaType)) {
+        const responseSnapshot: OutputAsset[] | null = r.responseSnapshot ? JSON.parse(r.responseSnapshot) : null
+        if (responseSnapshot?.some(asset => asset.kind === options.mediaType)) {
           count++
         }
       }
       return count
     }
 
-    const result = await selection.execute()
-    return result.length
+    // 使用数据库聚合计数
+    const query = this._buildQueryObject(options)
+    return await this._ctx.database.eval('medialuna_task', row => $.count(row.id), query)
   }
 
   /** 删除任务 */
   async delete(id: number): Promise<boolean> {
-    const existing = await this.getById(id)
-    if (!existing) return false
-
-    await this._ctx.database.remove('medialuna_task', { id })
-    return true
+    const result = await this._ctx.database.remove('medialuna_task', { id })
+    return (result.matched ?? 0) > 0
   }
 
   /** 按状态删除任务 */
   async deleteByStatus(status: TaskStatus): Promise<number> {
-    const result = await this._ctx.database.get('medialuna_task', { status })
-    const ids = result.map(r => r.id)
-
-    if (ids.length > 0) {
-      for (const id of ids) {
-        await this._ctx.database.remove('medialuna_task', { id })
-      }
+    const count = await this.count({ status })
+    if (count > 0) {
+      await this._ctx.database.remove('medialuna_task', { status })
     }
-
-    return ids.length
+    return count
   }
 
   /** 清理旧任务 */
   async cleanup(beforeDate: Date): Promise<number> {
-    // 先查询符合条件的任务
-    const result = await this._ctx.database.get('medialuna_task', {
-      createdAt: { $lt: beforeDate }
-    })
-
-    const ids = result.map(r => r.id)
-    if (ids.length > 0) {
-      for (const id of ids) {
-        await this._ctx.database.remove('medialuna_task', { id })
-      }
+    const count = await this._ctx.database.eval(
+      'medialuna_task',
+      row => $.count(row.id),
+      { createdAt: { $lt: beforeDate } }
+    )
+    if (count > 0) {
+      await this._ctx.database.remove('medialuna_task', {
+        createdAt: { $lt: beforeDate }
+      } as any)
     }
-
-    return ids.length
+    return count
   }
 
-  /** 获取统计信息 */
+  /** 获取统计信息（并行聚合查询，不加载记录） */
   async getStats(): Promise<{
     total: number
     pending: number
@@ -271,11 +298,14 @@ export class TaskService {
     failed: number
     successRate: number
   }> {
-    const total = await this.count()
-    const pending = await this.count({ status: 'pending' })
-    const processing = await this.count({ status: 'processing' })
-    const success = await this.count({ status: 'success' })
-    const failed = await this.count({ status: 'failed' })
+    const db = this._ctx.database
+    const [total, pending, processing, success, failed] = await Promise.all([
+      db.eval('medialuna_task', row => $.count(row.id)),
+      db.eval('medialuna_task', row => $.count(row.id), { status: 'pending' }),
+      db.eval('medialuna_task', row => $.count(row.id), { status: 'processing' }),
+      db.eval('medialuna_task', row => $.count(row.id), { status: 'success' }),
+      db.eval('medialuna_task', row => $.count(row.id), { status: 'failed' }),
+    ])
 
     const completed = success + failed
     const successRate = completed > 0 ? (success / completed) * 100 : 0
@@ -312,27 +342,25 @@ export class TaskService {
     const limit = Math.min(options.limit || 20, 100)
     const offset = options.offset || 0
 
-    // 查询成功的任务
-    const queryOptions: TaskQueryOptions = {
-      uid,
-      status: 'success',
-      limit: limit + 1,  // 多查一条用于判断 hasMore
-      offset
-    }
-    if (options.channelId) {
-      queryOptions.channelId = options.channelId
-    }
-
-    const tasks = await this.query(queryOptions)
-    const hasMore = tasks.length > limit
-    const items = tasks.slice(0, limit)
-
-    // 统计总数
-    const total = await this.count({
+    // 并行执行列表查询和计数
+    const countOptions: Omit<TaskQueryOptions, 'limit' | 'offset'> = {
       uid,
       status: 'success',
       channelId: options.channelId
-    })
+    }
+    const queryOptions: TaskQueryOptions = {
+      ...countOptions,
+      limit: limit + 1,  // 多查一条用于判断 hasMore
+      offset
+    }
+
+    const [tasks, total] = await Promise.all([
+      this.query(queryOptions),
+      this.count(countOptions)
+    ])
+
+    const hasMore = tasks.length > limit
+    const items = tasks.slice(0, limit)
 
     return {
       items: items.map(task => ({

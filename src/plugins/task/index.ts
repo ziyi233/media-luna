@@ -65,5 +65,5 @@ export default definePlugin({
 })
 
 // 导出类型和服务
-export { TaskService, TaskData, TaskStatus, TaskQueryOptions } from './service'
+export { TaskService, TaskData, TaskListItem, TaskStatus, TaskQueryOptions } from './service'
 export type { TaskPluginConfig } from './config'

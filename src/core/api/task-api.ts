@@ -101,12 +101,31 @@ export function registerTaskApi(ctx: Context): void {
     }
   })
 
-  // 获取任务统计
+  // 获取任务统计（单次查询）
   console.addListener('media-luna/tasks/stats', async ({ channelId, startDate }: { channelId?: number, startDate?: string } = {}) => {
     try {
       const { tasks, error } = getTaskService()
       if (error) return error
 
+      // 无筛选条件时使用优化的 getStats（单次查询）
+      if (!channelId && !startDate) {
+        const stats = await tasks.getStats()
+        return {
+          success: true,
+          data: {
+            total: stats.total,
+            byStatus: {
+              pending: stats.pending,
+              processing: stats.processing,
+              success: stats.success,
+              failed: stats.failed
+            },
+            successRate: stats.successRate.toFixed(2) + '%'
+          }
+        }
+      }
+
+      // 有筛选条件时，使用聚合 count（5 次轻量 COUNT 查询）
       const queryOptions: { channelId?: number, startDate?: Date } = {}
       if (channelId) queryOptions.channelId = channelId
       if (startDate) queryOptions.startDate = new Date(startDate)
@@ -372,11 +391,11 @@ export function registerTaskApi(ctx: Context): void {
       // 限制一次最多查询 100 个用户
       const limitedUids = uids.slice(0, 100)
 
-      // 1. 从 Koishi 用户表获取基本信息
-      const users = await ctx.database.get('user', limitedUids)
-
-      // 2. 获取用户的平台绑定信息
-      const bindings = await ctx.database.get('binding', { aid: limitedUids })
+      // 1. 并行获取用户表和绑定表
+      const [users, bindings] = await Promise.all([
+        ctx.database.get('user', limitedUids),
+        ctx.database.get('binding', { aid: limitedUids })
+      ])
 
       // 按 aid 分组绑定信息
       const bindingsByAid = new Map<number, Array<{ platform: string; pid: string }>>()
@@ -387,42 +406,47 @@ export function registerTaskApi(ctx: Context): void {
         bindingsByAid.get(binding.aid)!.push({ platform: binding.platform, pid: binding.pid })
       }
 
-      // 3. 构建 uid -> 用户信息 的映射
+      // 2. 构建初始用户映射
       const userMap: Record<number, { name?: string; avatar?: string; platform?: string }> = {}
-
       for (const user of users) {
-        const userBindings = bindingsByAid.get(user.id) || []
-
-        // 先用数据库中的 name 作为默认值
         userMap[user.id] = {
           name: (user as any).name || undefined,
           avatar: undefined,
           platform: undefined
         }
+      }
 
-        // 尝试通过 bot 获取平台用户信息
+      // 3. 并行请求平台用户信息（每个用户只取第一个有效绑定）
+      const platformTasks: Array<{ userId: number; binding: { platform: string; pid: string } }> = []
+      for (const user of users) {
+        const userBindings = bindingsByAid.get(user.id) || []
         for (const binding of userBindings) {
-          try {
-            // 查找对应平台的 bot
-            const bot = ctx.bots.find(b => b.platform === binding.platform && b.status === Status.ONLINE)
-            if (!bot) continue
-
-            // 调用 bot.getUser 获取平台用户信息
-            const platformUser = await bot.getUser(binding.pid)
-            if (platformUser) {
-              userMap[user.id] = {
-                name: platformUser.nick || platformUser.name || userMap[user.id].name,
-                avatar: platformUser.avatar,
-                platform: binding.platform
-              }
-              break // 成功获取到信息，不再尝试其他平台
-            }
-          } catch {
-            // 获取失败，尝试下一个绑定
-            continue
+          const bot = ctx.bots.find(b => b.platform === binding.platform && b.status === Status.ONLINE)
+          if (bot) {
+            platformTasks.push({ userId: user.id, binding })
+            break  // 每个用户只用一个绑定
           }
         }
       }
+
+      // 并行执行所有 bot.getUser 调用，带超时保护
+      const results = await Promise.allSettled(
+        platformTasks.map(async ({ userId, binding }) => {
+          const bot = ctx.bots.find(b => b.platform === binding.platform && b.status === Status.ONLINE)
+          if (!bot) return null
+          const platformUser = await Promise.race([
+            bot.getUser(binding.pid),
+            new Promise<null>(resolve => setTimeout(() => resolve(null), 5000))
+          ])
+          if (platformUser) {
+            userMap[userId] = {
+              name: platformUser.nick || platformUser.name || userMap[userId]?.name,
+              avatar: platformUser.avatar,
+              platform: binding.platform
+            }
+          }
+        })
+      )
 
       return { success: true, data: userMap }
     } catch (error) {

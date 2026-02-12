@@ -64,7 +64,15 @@ export function extendDatabase(ctx: Context): void {
     duration: 'unsigned',
     createdAt: 'timestamp'
   }, {
-    autoInc: true
+    autoInc: true,
+    indexes: [
+      'uid',
+      'channelId',
+      'status',
+      'createdAt',
+      ['channelId', 'status'],  // 按渠道+状态的组合查询
+      ['uid', 'status'],        // 按用户+状态的组合查询
+    ]
   })
 
   // 注意：中间件配置和通用配置已迁移到 YAML 配置文件

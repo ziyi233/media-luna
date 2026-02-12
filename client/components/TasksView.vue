@@ -212,11 +212,9 @@
                       />
                       <div v-else-if="asset.kind === 'video'" class="output-thumb video-thumb">
                         🎬
-                        <span v-if="asset.meta?.duration" class="media-duration">{{ formatMediaDuration(asset.meta.duration) }}</span>
                       </div>
                       <div v-else-if="asset.kind === 'audio'" class="output-thumb audio-thumb">
                         🎵
-                        <span v-if="asset.meta?.duration" class="media-duration">{{ formatMediaDuration(asset.meta.duration) }}</span>
                       </div>
                       <div v-else-if="asset.kind === 'text'" class="output-thumb text-thumb">📝</div>
                       <div v-else-if="asset.kind === 'file'" class="output-thumb file-thumb">📁</div>
@@ -316,70 +314,6 @@
       </div>
       <div class="page-total">共 {{ total }} 条</div>
     </div>
-
-    <!-- 任务详情对话框 -->
-    <Teleport to="#ml-teleport-container" defer>
-      <div v-if="detailVisible" class="modal-overlay" @click.self="detailVisible = false">
-        <div class="modal-dialog large pop-card no-hover">
-          <div class="modal-header">
-            <h3>任务详情</h3>
-            <button class="modal-close" @click="detailVisible = false">✕</button>
-          </div>
-          <div class="modal-body pop-scrollbar" v-if="currentTask">
-            <div class="detail-section">
-              <h4>基本信息</h4>
-              <div class="detail-grid">
-                <div class="detail-item"><span class="label">ID:</span> {{ currentTask.id }}</div>
-                <div class="detail-item"><span class="label">状态:</span> <StatusBadge :status="currentTask.status" /></div>
-                <div class="detail-item"><span class="label">渠道 ID:</span> {{ currentTask.channelId }}</div>
-                <div class="detail-item"><span class="label">用户 UID:</span> {{ currentTask.uid ?? 'N/A' }}</div>
-                <div class="detail-item"><span class="label">创建时间:</span> {{ formatDate(currentTask.startTime) }}</div>
-                <div class="detail-item"><span class="label">耗时:</span> {{ formatDuration(currentTask.duration || 0) }}</div>
-              </div>
-            </div>
-
-            <div class="detail-section">
-              <h4>Prompt</h4>
-              <div class="code-block">{{ getFinalPrompt(currentTask) }}</div>
-            </div>
-
-            <div class="detail-section" v-if="currentTask.responseSnapshot && currentTask.responseSnapshot.length > 0">
-              <h4>生成结果 ({{ currentTask.responseSnapshot.length }} 个资产)</h4>
-              <div class="output-gallery">
-                <div
-                  v-for="(asset, idx) in currentTask.responseSnapshot"
-                  :key="idx"
-                  class="output-item"
-                >
-                  <template v-if="asset.kind === 'image' && asset.url">
-                    <img :src="asset.url" class="output-image" />
-                  </template>
-                  <template v-else-if="asset.kind === 'video' && asset.url">
-                    <video :src="asset.url" class="output-image" controls />
-                  </template>
-                  <template v-else-if="asset.kind === 'audio' && asset.url">
-                    <audio :src="asset.url" controls style="width: 100%;" />
-                  </template>
-                  <template v-else-if="asset.kind === 'text' && asset.content">
-                    <div class="text-asset">{{ asset.content }}</div>
-                  </template>
-                  <template v-else-if="asset.url">
-                    <a :href="asset.url" target="_blank" class="file-link">
-                      📁 {{ asset.meta?.filename || asset.url }}
-                    </a>
-                  </template>
-                </div>
-              </div>
-            </div>
-
-            <div class="detail-section" v-if="currentTask.middlewareLogs?.request?.error">
-              <h4>错误信息</h4>
-              <div class="code-block error">{{ currentTask.middlewareLogs.request.error }}</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </Teleport>
 
     <!-- 图片预览弹窗 -->
     <ImageLightbox
@@ -546,10 +480,6 @@ const filter = ref({
 
 // 渠道列表（用于下拉筛选）
 const channels = ref<ChannelConfig[]>([])
-
-// 详情
-const detailVisible = ref(false)
-const currentTask = ref<TaskData | null>(null)
 
 // 画廊详情
 const galleryDetailVisible = ref(false)
@@ -768,11 +698,6 @@ const goToPage = (newPage: number) => {
   }
 }
 
-const openDetailDialog = (task: TaskData) => {
-  currentTask.value = task
-  detailVisible.value = true
-}
-
 const openGalleryDetail = (item: GalleryItem) => {
   // 设置 taskId 和当前图片索引，ImageLightbox 会自己获取任务数据
   lightboxTaskId.value = item.id
@@ -889,17 +814,11 @@ const doBatchDelete = async () => {
   fetchData()
 }
 
-// 行点击处理 - 打开 ImageLightbox 查看详情
+// 行点击处理 - 统一使用 ImageLightbox 查看详情
 const handleRowClick = (row: TaskData) => {
-  // 如果有图片/视频输出，打开 Lightbox
-  if (row.responseSnapshot && row.responseSnapshot.length > 0) {
-    lightboxTaskId.value = row.id
-    lightboxIndex.value = 0
-    lightboxVisible.value = true
-  } else {
-    // 没有输出的任务，打开详情弹窗
-    openDetailDialog(row)
-  }
+  lightboxTaskId.value = row.id
+  lightboxIndex.value = 0
+  lightboxVisible.value = true
 }
 
 const formatDate = (dateStr: string) => {
@@ -909,14 +828,6 @@ const formatDate = (dateStr: string) => {
 const formatDuration = (ms: number) => {
   if (ms < 1000) return `${ms}ms`
   return `${(ms / 1000).toFixed(2)}s`
-}
-
-/** 格式化媒体时长（秒 -> mm:ss） */
-const formatMediaDuration = (seconds: number) => {
-  if (!seconds || seconds <= 0) return ''
-  const mins = Math.floor(seconds / 60)
-  const secs = Math.floor(seconds % 60)
-  return mins > 0 ? `${mins}:${secs.toString().padStart(2, '0')}` : `0:${secs.toString().padStart(2, '0')}`
 }
 
 const handleImageError = (e: Event) => {
@@ -1299,12 +1210,6 @@ onMounted(() => {
 
 .audio-thumb {
   background: linear-gradient(135deg, rgba(103, 194, 58, 0.15), rgba(64, 158, 255, 0.15));
-}
-
-.media-duration {
-  font-size: 8px;
-  font-weight: 600;
-  margin-top: 2px;
 }
 
 .output-more {

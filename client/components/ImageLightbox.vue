@@ -22,6 +22,23 @@
                   <span>◀</span>
                 </button>
 
+                <!-- 无媒体时的状态占位 -->
+                <div v-if="mediaList.length === 0" class="no-media-placeholder">
+                  <template v-if="taskData?.status === 'processing' || taskData?.status === 'pending'">
+                    <span class="placeholder-icon spin">⏳</span>
+                    <span class="placeholder-text">{{ taskData.status === 'processing' ? '生成中...' : '等待中...' }}</span>
+                  </template>
+                  <template v-else-if="taskData?.status === 'failed'">
+                    <span class="placeholder-icon">❌</span>
+                    <span class="placeholder-text">生成失败</span>
+                    <span v-if="errorMessage" class="placeholder-error">{{ errorMessage }}</span>
+                  </template>
+                  <template v-else>
+                    <span class="placeholder-icon">📭</span>
+                    <span class="placeholder-text">无输出内容</span>
+                  </template>
+                </div>
+
                 <!-- 图片 -->
                 <img v-if="currentMedia?.kind === 'image'" :src="currentMedia.url" class="lightbox-image" alt="Preview" />
 
@@ -162,17 +179,25 @@
               </div>
 
               <div class="sidebar-footer">
-                <div class="footer-row">
-                  <button class="pop-btn primary" @click="openOriginal">
-                    🔗 {{ currentMedia?.kind === 'audio' ? '音频' : currentMedia?.kind === 'video' ? '视频' : '原图' }}
+                <template v-if="mediaList.length > 0">
+                  <div class="footer-row">
+                    <button class="pop-btn primary" @click="openOriginal">
+                      🔗 {{ currentMedia?.kind === 'audio' ? '音频' : currentMedia?.kind === 'video' ? '视频' : '原图' }}
+                    </button>
+                    <button class="pop-btn" @click="downloadMedia">
+                      💾 下载
+                    </button>
+                  </div>
+                  <button v-if="canSaveAsPreset" class="pop-btn full-width" @click="openSaveAsPreset">
+                    🎨 保存为预设
                   </button>
-                  <button class="pop-btn" @click="downloadMedia">
-                    💾 下载
-                  </button>
-                </div>
-                <button v-if="canSaveAsPreset" class="pop-btn full-width" @click="openSaveAsPreset">
-                  🎨 保存为预设
-                </button>
+                </template>
+                <template v-else>
+                  <div class="footer-status">
+                    <StatusBadge v-if="taskData" :status="taskData.status" />
+                    <span class="footer-task-id">#{{ taskData?.id }}</span>
+                  </div>
+                </template>
               </div>
             </div>
           </div>
@@ -195,6 +220,7 @@ import { taskApi, userApi } from '../api'
 import type { TaskData, AssetKind } from '../types'
 import AudioPlayer from './AudioPlayer.vue'
 import PresetDialog from './PresetDialog.vue'
+import StatusBadge from './StatusBadge.vue'
 
 /** 媒体项 */
 interface MediaItem {
@@ -258,6 +284,7 @@ const currentMedia = computed<MediaItem | null>(() => mediaList.value[currentInd
 
 // 侧边栏标题（根据媒体类型动态显示）
 const sidebarTitle = computed(() => {
+  if (mediaList.value.length === 0) return '任务详情'
   const kind = currentMedia.value?.kind
   if (kind === 'audio') return '音频详情'
   if (kind === 'video') return '视频详情'
@@ -327,6 +354,13 @@ const presetInfo = computed(() => {
     name: preset.presetName,
     referenceCount: preset.referenceImagesInjected || 0
   }
+})
+
+// 错误信息（用于失败任务占位显示）
+const errorMessage = computed(() => {
+  if (!taskData.value) return ''
+  const logs = taskData.value.middlewareLogs as any
+  return logs?.request?.error || ''
 })
 
 // 获取任务数据
@@ -601,6 +635,57 @@ const handlePresetSaved = () => {
 
 @keyframes spin {
   to { transform: rotate(360deg); }
+}
+
+/* 无媒体占位 */
+.no-media-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: rgba(255, 255, 255, 0.6);
+  user-select: none;
+}
+
+.placeholder-icon {
+  font-size: 3rem;
+  display: inline-block;
+}
+
+.placeholder-text {
+  font-size: 1rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.placeholder-error {
+  font-size: 0.8rem;
+  color: rgba(244, 67, 54, 0.8);
+  max-width: 400px;
+  text-align: center;
+  line-height: 1.5;
+  word-break: break-word;
+  padding: 8px 16px;
+  background: rgba(244, 67, 54, 0.1);
+  border-radius: var(--ml-radius);
+  border: 1px solid rgba(244, 67, 54, 0.3);
+}
+
+/* 底部状态栏 */
+.footer-status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 4px 0;
+}
+
+.footer-task-id {
+  font-family: 'Consolas', monospace;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--ml-text-muted);
 }
 
 /* 关闭按钮 */

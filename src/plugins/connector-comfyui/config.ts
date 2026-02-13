@@ -39,25 +39,25 @@ export const connectorFields: ConnectorField[] = [
     label: '接受图片数量',
     type: 'number',
     default: 1,
-    description: '该工作流接受的图片数量 (1-3)'
+    description: '该工作流接受的图片数量 (0-3)'
   },
   {
     key: 'imageNodeId1',
-    label: '图片1 输入节点 ID',
+    label: '图片1 输入节点 ID（可选）',
     type: 'text',
     default: '',
     description: '第一张图片的 LoadImage 节点 ID'
   },
   {
     key: 'imageNodeId2',
-    label: '图片2 输入节点 ID',
+    label: '图片2 输入节点 ID（可选）',
     type: 'text',
     default: '',
     description: '第二张图片的 LoadImage 节点 ID'
   },
   {
     key: 'imageNodeId3',
-    label: '图片3 输入节点 ID',
+    label: '图片3 输入节点 ID（可选）',
     type: 'text',
     default: '',
     description: '第三张图片的 LoadImage 节点 ID'

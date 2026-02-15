@@ -36,6 +36,7 @@ async function uploadImage(
   imageBuffer: ArrayBuffer | Buffer,
   filename: string
 ): Promise<{ success: boolean; data?: any; error?: string }> {
+  const logger = ctx.logger('media-luna')
   try {
     const formData = new FormData()
     // 确保转换为 Buffer
@@ -44,14 +45,26 @@ async function uploadImage(
     formData.append('overwrite', 'true')
     formData.append('type', 'input')
 
+    // 将 FormData 转为 Buffer 以避免 chunked encoding 并计算准确的 Content-Length
+    const payload = formData.getBuffer()
+
+    // 显式设置 Content-Length
+    const headers = {
+      ...formData.getHeaders(),
+      'Content-Length': payload.length.toString()
+    }
+
+    logger.info('[comfyui] Step 1: Uploading image... (Size: %d bytes)', payload.length)
+
     const response = await ctx.http.post(
       `${getHttpProtocol(isSecure)}://${serverEndpoint}/upload/image`,
-      formData,
-      { headers: formData.getHeaders() }
+      payload,
+      { headers }
     )
 
     return { success: true, data: response }
   } catch (error) {
+    logger.error('[comfyui] Upload failed: %s', error)
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Upload failed'
@@ -116,63 +129,151 @@ function modifyWorkflowToAvoidCache(workflow: any, avoidCache: boolean): any {
 /**
  * 等待执行完成并获取结果
  */
-function waitForCompletion(
-  ctx: Context,
-  serverEndpoint: string,
+/**
+ * 建立 WebSocket 连接
+ */
+function connectWebSocket(
   isSecure: boolean,
-  clientId: string,
-  promptId: string,
-  timeoutMs: number
-): Promise<any> {
+  serverEndpoint: string,
+  clientId: string
+): Promise<WebSocket> {
   return new Promise((resolve, reject) => {
     const wsUrl = `${getWsProtocol(isSecure)}://${serverEndpoint}/ws?clientId=${clientId}`
     const ws = new WebSocket(wsUrl, { perMessageDeflate: false })
 
+    // 设置 10s 连接超时
     const timer = setTimeout(() => {
+      cleanup()
       ws.close()
-      reject(new Error('ComfyUI execution timeout'))
+      reject(new Error('WebSocket connection timeout'))
+    }, 10000)
+
+    const onOpen = () => {
+      cleanup()
+      resolve(ws)
+    }
+
+    const onError = (err: Error) => {
+      cleanup()
+      reject(err)
+    }
+
+    ws.on('open', onOpen)
+    ws.on('error', onError)
+
+    function cleanup() {
+      ws.off('open', onOpen)
+      ws.off('error', onError)
+      clearTimeout(timer)
+    }
+  })
+}
+
+/**
+ * 监听任务完成
+ */
+/**
+ * 监听任务完成
+ */
+function setupCompletionListener(
+  ctx: Context,
+  serverEndpoint: string,
+  isSecure: boolean,
+  ws: WebSocket,
+  timeoutMs: number
+) {
+  const logger = ctx.logger('media-luna')
+  let targetPromptId: string | undefined
+  let resolved = false
+
+  const completionPromise = new Promise<void>((resolve, reject) => {
+    // 1. 超时定时器
+    const timeoutTimer = setTimeout(() => {
+      cleanup()
+      if (!resolved) reject(new Error('ComfyUI execution timeout'))
     }, timeoutMs)
 
-    ws.on('error', (err) => {
-      clearTimeout(timer)
-      reject(err)
-    })
+    // 2. 轮询定时器 (每 1s 检查一次历史记录)
+    // 这是为了防止 WebSocket 事件丢失导致死锁
+    const pollingTimer = setInterval(async () => {
+      if (!targetPromptId || resolved) return
 
-    ws.on('message', async (data, isBinary) => {
+      try {
+        const history = await getHistory(ctx, serverEndpoint, isSecure, targetPromptId)
+        if (history) {
+          logger.info('[comfyui] Task %s completed (detected via polling)', targetPromptId)
+          resolved = true
+          cleanup()
+          resolve()
+        }
+      } catch (e) {
+        // ignore polling errors
+      }
+    }, 1000)
+
+    const onMessage = (data: any, isBinary: boolean) => {
       if (isBinary) return
 
       try {
         const message = JSON.parse(data.toString())
 
-        // 检查执行完成：executing + node === null
+        // Debug log for relevant messages
+        if (message.type === 'executing' || message.type === 'execution_error') {
+          logger.debug('[comfyui] WS Message: %o', message)
+        }
+
+        // 检查执行完成
         if (
           message.type === 'executing' &&
-          message.data.prompt_id === promptId &&
-          message.data.node === null
+          message.data.node === null &&
+          message.data.prompt_id === targetPromptId
         ) {
-          clearTimeout(timer)
-          ws.close()
-
-          // 获取历史记录和结果
-          try {
-            const history = await getHistory(ctx, serverEndpoint, isSecure, promptId)
-            resolve(history)
-          } catch (e) {
-            reject(new Error('Failed to get execution history'))
-          }
+          logger.info('[comfyui] Task %s completed (detected via WebSocket)', targetPromptId)
+          resolved = true
+          cleanup()
+          resolve()
         }
 
         // 执行错误
-        if (message.type === 'execution_error' && message.data.prompt_id === promptId) {
-          clearTimeout(timer)
-          ws.close()
+        if (
+          message.type === 'execution_error' &&
+          message.data.prompt_id === targetPromptId
+        ) {
+          resolved = true
+          cleanup()
           reject(new Error(`ComfyUI Error: ${JSON.stringify(message.data)}`))
         }
       } catch (e) {
-        // ignore parse error
+        // ignore
       }
-    })
+    }
+
+    const onClose = () => {
+      if (!resolved) {
+        // WebSocket 断开不一定是错误，如果轮询能查到结果也算成功
+        // 但这里我们简单处理，如果没有 targetPromptId 或者还没有完成，就报错
+        // 实际生产中可能由于网络波动 ws 断开，但任务还在跑。
+        // 由于我们有轮询，这里可以不立即 reject，而是等待超时。
+        // 但为了保持逻辑简单，且 WS 断开通常意味着连接出了问题，我们记录日志。
+        logger.warn('[comfyui] WebSocket connection closed unexpectedly')
+      }
+    }
+
+    ws.on('message', onMessage)
+    ws.on('close', onClose)
+
+    function cleanup() {
+      ws.off('message', onMessage)
+      ws.off('close', onClose)
+      clearTimeout(timeoutTimer)
+      clearInterval(pollingTimer)
+    }
   })
+
+  return {
+    setPromptId: (id: string) => { targetPromptId = id },
+    completionPromise
+  }
 }
 
 /** ComfyUI 生成函数 */
@@ -189,7 +290,10 @@ async function generate(
     isSecureConnection = false,
     workflow,
     promptNodeId,
-    imageNodeId,
+    imageCount = 1,
+    imageNodeId1,
+    imageNodeId2,
+    imageNodeId3,
     avoidCache = true,
     timeout = 300
   } = config
@@ -235,109 +339,229 @@ async function generate(
     }
   }
 
-  // 3. 处理输入图片
-  const imageFile = files.find(f => f.mime?.startsWith('image/'))
-  if (imageFile && imageFile.data) {
-    const filename = `input_${Date.now()}.png`
-    const uploadResult = await uploadImage(ctx, serverEndpoint, isSecure, imageFile.data, filename)
+  // 3. 处理输入图片（支持多图）
+  // 过滤非图片文件
+  const imageFiles = files.filter(f => f.mime?.startsWith('image/'))
 
-    if (!uploadResult.success) {
-      throw new Error(`图片上传失败: ${uploadResult.error}`)
-    }
-
-    // 获取上传后的实际文件名
-    const uploadedFilename = uploadResult.data?.name || filename
-
-    // 修改 LoadImage 节点
-    const loadNodeKey = imageNodeId || Object.keys(workflowJson).find(
-      k => workflowJson[k].class_type === 'LoadImage'
-    )
-    if (loadNodeKey && workflowJson[loadNodeKey]) {
-      workflowJson[loadNodeKey].inputs.image = uploadedFilename
-    }
+  // 检查图片数量是否符合配置要求
+  if (imageFiles.length !== imageCount) {
+    throw new Error(`图片数量不符：需要 ${imageCount} 张，实际提供了 ${imageFiles.length} 张`)
   }
 
-  // 4. 生成客户端 ID 并提交任务
-  const clientId = Math.random().toString(36).substring(2, 15)
+  const uploadedImages: string[] = []
 
-  const queueResponse = await ctx.http.post(
-    `${getHttpProtocol(isSecure)}://${serverEndpoint}/prompt`,
-    {
-      prompt: workflowJson,
-      client_id: clientId
-    },
-    {
-      headers: {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json'
+  if (imageFiles.length > 0) {
+    logger.info('[comfyui] Found %d input images', imageFiles.length)
+
+    // 上传所有图片
+    for (const [index, imageFile] of imageFiles.entries()) {
+      if (imageFile.data) {
+        const filename = `input_${Date.now()}_${index}.png`
+        logger.info('[comfyui] Uploading image %d/%d...', index + 1, imageFiles.length)
+        const uploadResult = await uploadImage(ctx, serverEndpoint, isSecure, imageFile.data, filename)
+
+        if (!uploadResult.success) {
+          logger.error('[comfyui] Upload failed for image %d: %s', index + 1, uploadResult.error)
+          throw new Error(`图片 ${index + 1} 上传失败: ${uploadResult.error}`)
+        }
+
+        const uploadedFilename = uploadResult.data?.name || filename
+        uploadedImages.push(uploadedFilename)
       }
     }
-  )
 
-  const promptId = queueResponse.prompt_id
-  if (!promptId) {
-    throw new Error('提交工作流失败：未返回 prompt_id')
-  }
+    if (uploadedImages.length > 0) {
+      logger.info('[comfyui] Images uploaded successfully. Assigning to LoadImage nodes...')
 
-  logger.debug('[comfyui] Workflow queued: %s', promptId)
+      // 查找所有 LoadImage 节点
+      const loadImageNodes = Object.keys(workflowJson).filter(
+        k => workflowJson[k].class_type === 'LoadImage'
+      )
 
-  // 5. 等待执行完成
-  const history = await waitForCompletion(
-    ctx,
-    serverEndpoint,
-    isSecure,
-    clientId,
-    promptId,
-    timeout * 1000
-  )
+      if (loadImageNodes.length === 0) {
+        logger.warn('[comfyui] Workflow has no LoadImage nodes, but input images were provided.')
+      } else {
+        const assignedNodes = new Set<string>()
 
-  // 6. 从历史记录中获取输出图片
-  const assets: OutputAsset[] = []
+        // 辅助函数：尝试分配图片到节点
+        const assignImageToNode = (imageIndex: number, nodeId: string | undefined, imageFilename: string) => {
+          if (nodeId && workflowJson[nodeId]) {
+            workflowJson[nodeId].inputs.image = imageFilename
+            assignedNodes.add(nodeId)
+            logger.info('[comfyui] Assigned image %d to specified node %s', imageIndex + 1, nodeId)
+            return true
+          }
+          return false
+        }
 
-  if (history?.outputs) {
-    for (const nodeId of Object.keys(history.outputs)) {
-      const nodeOutput = history.outputs[nodeId]
-      if (nodeOutput.images && Array.isArray(nodeOutput.images)) {
-        for (const imageInfo of nodeOutput.images) {
-          // 只获取 output 类型的图片
-          if (imageInfo.type === 'output' || !imageInfo.type) {
-            try {
-              const imageBuffer = await getImage(
-                ctx,
-                serverEndpoint,
-                isSecure,
-                imageInfo.filename,
-                imageInfo.subfolder || '',
-                imageInfo.type || 'output'
-              )
+        // 1. 优先尝试分配到指定 ID 的节点
+        const imageNodeIds = [imageNodeId1, imageNodeId2, imageNodeId3]
 
-              const mime = imageInfo.filename.endsWith('.png') ? 'image/png' : 'image/jpeg'
-              const base64 = imageBuffer.toString('base64')
+        for (let i = 0; i < uploadedImages.length; i++) {
+          const targetNodeId = imageNodeIds[i]
+          if (targetNodeId) {
+            assignImageToNode(i, targetNodeId, uploadedImages[i])
+          }
+        }
 
-              assets.push({
-                kind: 'image',
-                url: `data:${mime};base64,${base64}`,
-                mime,
-                meta: {
-                  promptId,
-                  filename: imageInfo.filename,
-                  nodeId
-                }
-              })
-            } catch (e) {
-              logger.warn('[comfyui] Failed to get image %s: %s', imageInfo.filename, e)
-            }
+        // 2. 对于没有被指定 ID 分配的图片，顺序分配给尚未使用的 LoadImage 节点
+        let currentNodeIndex = 0
+        for (let i = 0; i < uploadedImages.length; i++) {
+          // 如果该图片已经通过指定 ID 分配了，跳过
+          // (注意：这里的逻辑是，如果 imageNodeId[i] 存在且有效，上面已经处理了。
+          //  我们需要检查的是，这张图片是否 *已经* 被分配给了某个节点？ 
+          //  上面的 assignImageToNode 直接修改了 workflowJson。这里我们需要知道这张图是否已经有着落了。
+          //  为了简化，我们可以只对 *未指定* ID 的图片进行自动分配。
+
+          if (imageNodeIds[i] && workflowJson[imageNodeIds[i]]) {
+            continue // 已经指定了有效 ID，跳过自动分配
+          }
+
+          // 寻找下一个未使用的 LoadImage 节点
+          while (currentNodeIndex < loadImageNodes.length && assignedNodes.has(loadImageNodes[currentNodeIndex])) {
+            currentNodeIndex++
+          }
+
+          if (currentNodeIndex < loadImageNodes.length) {
+            const nodeId = loadImageNodes[currentNodeIndex]
+            workflowJson[nodeId].inputs.image = uploadedImages[i]
+            assignedNodes.add(nodeId)
+            logger.info('[comfyui] Auto-assigned image %d to node %s', i + 1, nodeId)
+            currentNodeIndex++ // 移动到下一个节点
+          } else {
+            logger.warn('[comfyui] No available LoadImage node for image %d', i + 1)
           }
         }
       }
     }
   }
 
-  if (assets.length === 0) {
-    throw new Error('ComfyUI 执行完成但未返回图片')
-  }
+  // 4. 生成客户端 ID
+  const clientId = Math.random().toString(36).substring(2, 15)
 
-  return assets
+  let ws: WebSocket | undefined
+  try {
+    // 关键修复：先建立 WebSocket 连接，再提交任务
+    // 这样可以确保不会漏掉执行开始和完成的事件，同时让服务器正确关联 Client ID
+    ws = await connectWebSocket(isSecure, serverEndpoint, clientId)
+
+    // 设置监听器
+    // 设置监听器
+    const { setPromptId, completionPromise } = setupCompletionListener(ctx, serverEndpoint, isSecure, ws, timeout * 1000)
+
+    logger.info('[comfyui] Step 3: Queueing workflow...')
+    const queueResponse = await ctx.http.post(
+      `${getHttpProtocol(isSecure)}://${serverEndpoint}/prompt`,
+      {
+        prompt: workflowJson,
+        client_id: clientId
+      },
+      {
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        }
+      }
+    )
+
+    const promptId = queueResponse.prompt_id
+    if (!promptId) {
+      throw new Error('提交工作流失败：未返回 prompt_id')
+    }
+
+    // 更新监听的目标 ID
+    setPromptId(promptId)
+    logger.info('[comfyui] Step 4: Workflow queued: %s', promptId)
+
+    // 5. 等待执行完成
+    await completionPromise
+
+    // 6. 从历史记录中获取输出图片
+    const history = await getHistory(ctx, serverEndpoint, isSecure, promptId)
+    const assets: OutputAsset[] = []
+
+    if (history?.outputs) {
+      for (const nodeId of Object.keys(history.outputs)) {
+        const nodeOutput = history.outputs[nodeId]
+
+        // 辅助函数：处理输出文件
+        const processOutputFiles = async (outputFiles: any[], kind: 'image' | 'video') => {
+          if (!Array.isArray(outputFiles)) return
+
+          for (const fileInfo of outputFiles) {
+            // 只获取 output 类型的文件
+            if (fileInfo.type === 'output' || !fileInfo.type) {
+              try {
+                const fileBuffer = await getImage(
+                  ctx,
+                  serverEndpoint,
+                  isSecure,
+                  fileInfo.filename,
+                  fileInfo.subfolder || '',
+                  fileInfo.type || 'output'
+                )
+
+                // 简单的 MIME 推断
+                let mime = ''
+                const ext = fileInfo.filename.toLowerCase().split('.').pop()
+                if (kind === 'image') {
+                  mime = ext === 'png' ? 'image/png' : 'image/jpeg'
+                } else {
+                  if (ext === 'mp4') mime = 'video/mp4'
+                  else if (ext === 'webm') mime = 'video/webm'
+                  else if (ext === 'gif') mime = 'image/gif' // GIF 可以视为图片或视频
+                  else mime = 'application/octet-stream'
+                }
+
+                // 修正 AssetKind
+                const assetKind = (ext === 'gif') ? 'image' : kind
+                const base64 = fileBuffer.toString('base64')
+
+                assets.push({
+                  kind: assetKind,
+                  url: `data:${mime};base64,${base64}`,
+                  mime,
+                  meta: {
+                    promptId,
+                    filename: fileInfo.filename,
+                    nodeId
+                  }
+                })
+              } catch (e) {
+                logger.warn('[comfyui] Failed to get output %s: %s', fileInfo.filename, e)
+              }
+            }
+          }
+        }
+
+        // 处理图片输出
+        if (nodeOutput.images) {
+          await processOutputFiles(nodeOutput.images, 'image')
+        }
+
+        // 处理视频输出
+        if (nodeOutput.videos) {
+          await processOutputFiles(nodeOutput.videos, 'video')
+        }
+
+        // 处理 GIF 输出
+        if (nodeOutput.gifs) {
+          await processOutputFiles(nodeOutput.gifs, 'video')
+        }
+      }
+    }
+
+    if (assets.length === 0) {
+      throw new Error('ComfyUI 执行完成但未返回图片')
+    }
+
+    return assets
+
+  } finally {
+    if (ws) {
+      ws.close()
+    }
+  }
 }
 
 /** ComfyUI 连接器定义 */
@@ -346,7 +570,7 @@ export const ComfyUIConnector: ConnectorDefinition = {
   name: 'ComfyUI',
   description: '基于节点的图像生成工作流，支持自定义 Workflow',
   icon: 'comfyui',
-  supportedTypes: ['image'],
+  supportedTypes: ['image', 'video'],
   fields: connectorFields,
   cardFields: connectorCardFields,
   defaultTags: ['text2img', 'img2img', 'text2video', 'img2video'],

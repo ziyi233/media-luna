@@ -35,11 +35,32 @@ export const connectorFields: ConnectorField[] = [
     description: '如不使用 {{prompt}} 占位符，指定 CLIPTextEncode 节点 ID'
   },
   {
-    key: 'imageNodeId',
-    label: '图片输入节点 ID（可选）',
+    key: 'imageCount',
+    label: '接受图片数量',
+    type: 'number',
+    default: 1,
+    description: '该工作流接受的图片数量 (0-3)'
+  },
+  {
+    key: 'imageNodeId1',
+    label: '图片1 输入节点 ID（可选）',
     type: 'text',
     default: '',
-    description: 'LoadImage 节点 ID（用于图生图）'
+    description: '第一张图片的 LoadImage 节点 ID'
+  },
+  {
+    key: 'imageNodeId2',
+    label: '图片2 输入节点 ID（可选）',
+    type: 'text',
+    default: '',
+    description: '第二张图片的 LoadImage 节点 ID'
+  },
+  {
+    key: 'imageNodeId3',
+    label: '图片3 输入节点 ID（可选）',
+    type: 'text',
+    default: '',
+    description: '第三张图片的 LoadImage 节点 ID'
   },
   {
     key: 'avoidCache',

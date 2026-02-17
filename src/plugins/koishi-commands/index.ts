@@ -696,7 +696,7 @@ export default definePlugin({
 
             // 检查链接模式
             const channelTags: string[] = channel.tags || []
-            const linkModeTag = checkLinkMode(config, channelTags)
+            const linkModeTag = checkLinkMode(config, channelTags, session?.bot?.platform)
 
             return formatResult(result, linkModeTag, config, null, channel.name)
           } catch (error) {
@@ -1583,7 +1583,7 @@ async function executeGenerate(
     }
 
     // 检查是否需要使用链接模式（返回匹配的标签名或 null）
-    const linkModeTag = checkLinkMode(config, channelTags)
+    const linkModeTag = checkLinkMode(config, channelTags, session?.bot?.platform)
 
     // 查询上次成功生成时间（无论本次成功失败都显示）
     let lastSuccessTime: Date | null = null
@@ -1624,9 +1624,15 @@ async function executeGenerate(
  * 检查是否应该使用链接模式
  * 返回匹配的标签（用于显示原因），如果不匹配则返回 null
  */
-function checkLinkMode(config: KoishiCommandsConfig, channelTags: string[]): string | null {
+function checkLinkMode(config: KoishiCommandsConfig, channelTags: string[], platform?: string): string | null {
   if (!config.linkModeEnabled) return null
   if (!config.linkModeTags || typeof config.linkModeTags !== 'string' || !channelTags.length) return null
+
+  // 检查当前平台是否在排除列表中
+  if (platform && config.linkModeExcludePlatforms) {
+    const excludePlatforms = config.linkModeExcludePlatforms.split(',').map(p => p.trim().toLowerCase()).filter(Boolean)
+    if (excludePlatforms.includes(platform.toLowerCase())) return null
+  }
 
   // 解析配置的标签（逗号分隔）
   const linkTags = config.linkModeTags.split(',').map(t => t.trim().toLowerCase()).filter(Boolean)

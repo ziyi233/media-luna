@@ -16,6 +16,8 @@ export interface KoishiCommandsConfig {
   linkModeEnabled: boolean
   /** 触发链接模式的渠道标签（逗号分隔，如 nsfw,r18） */
   linkModeTags: string
+  /** 链接模式排除平台（逗号分隔，如 discord,telegram），这些平台即使匹配标签也直接发图 */
+  linkModeExcludePlatforms: string
   /** 是否输出文本内容 */
   outputTextContent: boolean
   /** 是否使用 NapCat/OneBot 的 get_file API 获取视频链接（修复 QQ 视频本地路径问题） */
@@ -32,6 +34,7 @@ export const defaultKoishiCommandsConfig: KoishiCommandsConfig = {
   directTriggerImageCount: 2,
   linkModeEnabled: false,
   linkModeTags: 'nsfw',
+  linkModeExcludePlatforms: '',
   outputTextContent: false,
   useNapCatFileApi: false,
   showLastSuccessTime: false
@@ -80,6 +83,13 @@ export const koishiCommandsConfigFields: ConfigField[] = [
     type: 'text',
     default: 'nsfw',
     description: '触发链接模式的渠道标签，多个标签用逗号分隔（如 nsfw,r18）'
+  },
+  {
+    key: 'linkModeExcludePlatforms',
+    label: '链接模式排除平台',
+    type: 'text',
+    default: '',
+    description: '这些平台即使渠道匹配链接标签也直接发图，多个平台用逗号分隔（如 discord,telegram）'
   },
   {
     key: 'outputTextContent',

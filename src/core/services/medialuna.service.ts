@@ -509,15 +509,16 @@ export class MediaLunaService extends Service {
   /** 获取中间件配置（从插件配置获取） */
   private async _getMiddlewareConfig(name: string): Promise<Record<string, any> | null> {
     // 从对应的插件配置获取 (plugin:xxx)
-    // 中间件名通常与插件 ID 相同，或者可以通过 configGroup/category 指定
+    // 中间件名通常与插件 ID 相同，或者可以通过 configGroup 指定
     const pluginConfig = this._configService.get<Record<string, any>>(`plugin:${name}`)
     if (pluginConfig && Object.keys(pluginConfig).length > 0) {
       return pluginConfig
     }
 
-    // 如果中间件有 configGroup 或 category，尝试从该插件获取配置
+    // 如果中间件有 configGroup，尝试从该插件获取配置
+    // 注意：不使用 category，category 仅用于 UI 分组
     const middleware = this._middlewareRegistry.get(name)
-    const configGroup = (middleware as any)?.configGroup || (middleware as any)?.category
+    const configGroup = (middleware as any)?.configGroup
     if (configGroup && configGroup !== name) {
       const groupConfig = this._configService.get<Record<string, any>>(`plugin:${configGroup}`)
       if (groupConfig && Object.keys(groupConfig).length > 0) {
@@ -530,9 +531,11 @@ export class MediaLunaService extends Service {
 
   /** 检查中间件是否启用 */
   private async _isMiddlewareEnabled(name: string, channel: ChannelConfig | null): Promise<boolean> {
-    // 获取中间件定义以获取 configGroup 或 category
+    // 获取中间件定义以获取 configGroup
+    // 注意：不使用 category 作为 fallback，category 仅用于 UI 分组
+    // 前端和 middleware API 都使用 configGroup || name，这里保持一致
     const middleware = this._middlewareRegistry.get(name)
-    const configGroup = (middleware as any)?.configGroup || (middleware as any)?.category || name
+    const configGroup = (middleware as any)?.configGroup || name
 
     // 1. 首先检查所属插件是否启用（最高优先级）
     // 如果插件被禁用，其下所有中间件都应该禁用

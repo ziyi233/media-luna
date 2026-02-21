@@ -126,6 +126,189 @@ function modifyWorkflowToAvoidCache(workflow: any, avoidCache: boolean): any {
   return modified
 }
 
+function applyParametersToWorkflow(workflow: any, parameters: Record<string, any>, config: Record<string, any>) {
+  if (!parameters || Object.keys(parameters).length === 0) return
+
+  // 辅助函数：限制数值范围
+  const clamp = (val: number, min?: number, max?: number) => {
+    if (min !== undefined && val < min) return min;
+    if (max !== undefined && val > max) return max;
+    return val;
+  }
+
+  // 限制各个标量参数
+  if (parameters.steps !== undefined) {
+    parameters.steps = clamp(parameters.steps, config.minSteps, config.maxSteps);
+  }
+  if (parameters.cfg !== undefined) {
+    parameters.cfg = clamp(parameters.cfg, config.minCfg, config.maxCfg);
+  }
+  if (parameters.denoise !== undefined) {
+    parameters.denoise = clamp(parameters.denoise, config.minDenoise, config.maxDenoise);
+  }
+  if (parameters.framerate !== undefined) {
+    parameters.framerate = clamp(parameters.framerate, config.minFramerate, config.maxFramerate);
+  }
+  if (parameters.time !== undefined) {
+    parameters.time = clamp(parameters.time, config.minTime, config.maxTime);
+  }
+  if (parameters.motion !== undefined) {
+    parameters.motion = clamp(parameters.motion, config.minMotion, config.maxMotion);
+  }
+
+  // 解析分辨率
+  let width: number | undefined
+  let height: number | undefined
+  let maxSide: number | undefined
+
+  if (parameters.resolution) {
+    if (typeof parameters.resolution === 'string' && parameters.resolution.includes('x')) {
+      const [w, h] = parameters.resolution.split('x').map(x => parseInt(x, 10))
+      if (!isNaN(w) && !isNaN(h)) {
+        width = w
+        height = h
+        maxSide = Math.max(w, h)
+      }
+    } else {
+      const v = parseInt(parameters.resolution, 10)
+      if (!isNaN(v)) {
+        maxSide = v
+        width = v
+        height = v
+      }
+    }
+
+    // 应用分辨率限制
+    const minRes = config.minResolution
+    const maxRes = config.maxResolution
+
+    if (maxSide !== undefined) {
+      if (minRes !== undefined && maxSide < minRes) {
+        const scale = minRes / maxSide
+        maxSide = minRes
+        if (width !== undefined) width = Math.round(width * scale)
+        if (height !== undefined) height = Math.round(height * scale)
+      } else if (maxRes !== undefined && maxSide > maxRes) {
+        const scale = maxRes / maxSide
+        maxSide = maxRes
+        if (width !== undefined) width = Math.round(width * scale)
+        if (height !== undefined) height = Math.round(height * scale)
+      }
+    }
+  }
+
+  // 辅助函数：设置节点输入值，支持处理链接情况
+  const setPrimitiveInput = (node: any, inputName: string, value: any) => {
+    if (!node || !node.inputs) return
+    const input = node.inputs[inputName]
+    if (Array.isArray(input)) {
+      // 遇到链接 [nodeId, slotIndex]
+      const linkedNodeId = String(input[0])
+      const linkedNode = workflow[linkedNodeId]
+      if (linkedNode && linkedNode.inputs) {
+        linkedNode.inputs.value = value
+      }
+    } else if (input !== undefined) {
+      node.inputs[inputName] = value
+    }
+  }
+
+  // 辅助函数：获取节点输入值或其链接指向的值
+  const getPrimitiveInput = (node: any, inputName: string): any => {
+    if (!node || !node.inputs) return undefined
+    const input = node.inputs[inputName]
+    if (Array.isArray(input)) {
+      const linkedNodeId = String(input[0])
+      const linkedNode = workflow[linkedNodeId]
+      if (linkedNode && linkedNode.inputs && linkedNode.inputs.value !== undefined) {
+        return linkedNode.inputs.value
+      }
+      return undefined
+    }
+    return input
+  }
+
+  // 先遍历一遍，获取帧率和插值乘数用于计算总帧数
+  let finalFramerate = parameters.framerate
+  let interpolationMultiplier = 1
+
+  if (finalFramerate === undefined) {
+    for (const nodeId in workflow) {
+      const node = workflow[nodeId]
+      if (node?.class_type === 'VHS_VideoCombine') {
+        const fps = getPrimitiveInput(node, 'frame_rate')
+        if (typeof fps === 'number') finalFramerate = fps
+      }
+    }
+  }
+
+  for (const nodeId in workflow) {
+    const node = workflow[nodeId]
+    if (node?.class_type === 'RIFE VFI') {
+      const mult = getPrimitiveInput(node, 'multiplier')
+      if (typeof mult === 'number') interpolationMultiplier = mult
+    }
+  }
+
+  for (const nodeId in workflow) {
+    const node = workflow[nodeId]
+    if (!node?.inputs) continue
+
+    // 步数, CFG, 重绘幅度
+    if (['KSampler', 'KSamplerAdvanced'].includes(node.class_type)) {
+      if (parameters.steps !== undefined) setPrimitiveInput(node, 'steps', parameters.steps)
+      if (parameters.cfg !== undefined) setPrimitiveInput(node, 'cfg', parameters.cfg)
+      if (parameters.denoise !== undefined) setPrimitiveInput(node, 'denoise', parameters.denoise)
+    }
+
+    // 视频帧率
+    if (['VHS_VideoCombine'].includes(node.class_type)) {
+      if (parameters.framerate !== undefined) setPrimitiveInput(node, 'frame_rate', parameters.framerate)
+    }
+
+    // 视频长度和运动幅度
+    if (['PainterI2V', 'WanFirstLastFrameToVideo', 'WanVideoGenerate'].includes(node.class_type)) {
+      if (parameters.time !== undefined) {
+        const fps = finalFramerate || 8
+        const mult = interpolationMultiplier || 1
+        const length = Math.ceil((fps / mult) * parameters.time + 1)
+        setPrimitiveInput(node, 'length', length)
+      }
+      if (parameters.motion !== undefined) {
+        setPrimitiveInput(node, 'motion_amplitude', parameters.motion)
+      }
+    }
+
+    // 分辨率处理
+    if (node.class_type === 'EmptyLatentImage') {
+      if (width !== undefined && height !== undefined) {
+        setPrimitiveInput(node, 'width', width)
+        setPrimitiveInput(node, 'height', height)
+      } else if (maxSide !== undefined) {
+        setPrimitiveInput(node, 'width', maxSide)
+        setPrimitiveInput(node, 'height', maxSide)
+      }
+    }
+
+    if (node.class_type === 'LayerUtility: ImageScaleByAspectRatio V2') {
+      if (maxSide !== undefined) {
+        setPrimitiveInput(node, 'scale_to_length', maxSide)
+      }
+    }
+
+    if (node.class_type === 'CR SDXL Aspect Ratio') {
+      if (width !== undefined && height !== undefined) {
+        // 'width' 可能是链接如 ["20", 0]，此时 setPrimitiveInput 会去更改节点 20 的 'value'
+        setPrimitiveInput(node, 'width', width)
+        setPrimitiveInput(node, 'height', height)
+      } else if (maxSide !== undefined) {
+        setPrimitiveInput(node, 'width', maxSide)
+        setPrimitiveInput(node, 'height', maxSide)
+      }
+    }
+  }
+}
+
 /**
  * 等待执行完成并获取结果
  */
@@ -281,7 +464,8 @@ async function generate(
   ctx: Context,
   config: Record<string, any>,
   files: FileData[],
-  prompt: string
+  prompt: string,
+  parameters?: Record<string, any>
 ): Promise<OutputAsset[]> {
   const logger = ctx.logger('media-luna')
 
@@ -316,6 +500,11 @@ async function generate(
 
   // 1. 随机化 seed（避免缓存）
   workflowJson = modifyWorkflowToAvoidCache(workflowJson, avoidCache)
+
+  // 应用用户命令行参数
+  if (parameters) {
+    applyParametersToWorkflow(workflowJson, parameters, config)
+  }
 
   // 2. 替换提示词
   const workflowStr = JSON.stringify(workflowJson)

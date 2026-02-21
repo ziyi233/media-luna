@@ -75,6 +75,104 @@ export const connectorFields: ConnectorField[] = [
     type: 'number',
     default: 300,
     description: '工作流执行超时时间'
+  },
+  {
+    key: 'maxResolution',
+    label: '最大分辨率的最长边',
+    type: 'number',
+    default: 2048,
+    description: '最大允许的生成分辨率的长边'
+  },
+  {
+    key: 'minResolution',
+    label: '最小分辨率的最长边',
+    type: 'number',
+    default: 256,
+    description: '最小允许的生成分辨率的长边'
+  },
+  {
+    key: 'maxSteps',
+    label: '最大步数',
+    type: 'number',
+    default: 100,
+    description: '最大允许的生成步数'
+  },
+  {
+    key: 'minSteps',
+    label: '最小步数',
+    type: 'number',
+    default: 1,
+    description: '最小允许的生成步数'
+  },
+  {
+    key: 'maxCfg',
+    label: '最大CFG',
+    type: 'number',
+    default: 20,
+    description: '最大允许的CFG比例'
+  },
+  {
+    key: 'minCfg',
+    label: '最小CFG',
+    type: 'number',
+    default: 1,
+    description: '最小允许的CFG比例'
+  },
+  {
+    key: 'maxDenoise',
+    label: '最大重绘幅度',
+    type: 'number',
+    default: 1.0,
+    description: '最大允许的图生图重绘幅度'
+  },
+  {
+    key: 'minDenoise',
+    label: '最小重绘幅度',
+    type: 'number',
+    default: 0.1,
+    description: '最小允许的图生图重绘幅度'
+  },
+  {
+    key: 'maxFramerate',
+    label: '最大帧率',
+    type: 'number',
+    default: 60,
+    description: '最大允许的视频生成帧率'
+  },
+  {
+    key: 'minFramerate',
+    label: '最小帧率',
+    type: 'number',
+    default: 8,
+    description: '最小允许的视频生成帧率'
+  },
+  {
+    key: 'maxTime',
+    label: '最大视频时长(秒)',
+    type: 'number',
+    default: 10,
+    description: '最大允许生成的视频时长'
+  },
+  {
+    key: 'minTime',
+    label: '最小视频时长(秒)',
+    type: 'number',
+    default: 1,
+    description: '最小允许生成的视频时长'
+  },
+  {
+    key: 'maxMotion',
+    label: '最大运动幅度',
+    type: 'number',
+    default: 3.0,
+    description: '最大允许的PainterI2V运动幅度'
+  },
+  {
+    key: 'minMotion',
+    label: '最小运动幅度',
+    type: 'number',
+    default: 0.1,
+    description: '最小允许的PainterI2V运动幅度'
   }
 ]
 

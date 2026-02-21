@@ -234,7 +234,7 @@ export class MediaLunaService extends Service {
   private async _loadBuiltinPlugins(): Promise<void> {
     await this._pluginLoader.loadAll(builtinPlugins)
     this._logger.info('Loaded %d builtin plugins', builtinPlugins.length)
-}
+  }
 
 
   /** 注册内置设置面板 */
@@ -472,6 +472,7 @@ export class MediaLunaService extends Service {
     presetName?: string
     prompt: string
     files?: import('../../types').FileData[]
+    parameters?: Record<string, any>
     session?: import('koishi').Session | null
     uid?: number
     onPrepareComplete?: (hints: string[]) => Promise<void>
@@ -495,7 +496,10 @@ export class MediaLunaService extends Service {
       channel: channel.id,
       prompt: options.prompt,
       files: options.files,
-      parameters: options.presetName ? { preset: options.presetName } : {},
+      parameters: {
+        ...(options.parameters || {}),
+        ...(options.presetName ? { preset: options.presetName } : {})
+      },
       session: options.session,
       uid: options.uid,
       onPrepareComplete: options.onPrepareComplete

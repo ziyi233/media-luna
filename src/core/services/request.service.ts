@@ -65,6 +65,7 @@ export class RequestService {
     config: Record<string, any>,
     files: FileData[],
     prompt: string,
+    parameters?: Record<string, any>,
     options?: {
       timeout?: number
       retries?: number
@@ -87,7 +88,7 @@ export class RequestService {
     const { timeout = 600000, retries = 0 } = options || {}
 
     // 获取请求日志
-    const requestLog = this._getRequestLog(connector, config, files, prompt)
+    const requestLog = this._getRequestLog(connector, config, files, prompt, parameters)
 
     // DEBUG: 输出完整请求信息
     this._logger.debug(
@@ -125,6 +126,7 @@ export class RequestService {
           config,
           files,
           prompt,
+          parameters,
           timeout
         )
 
@@ -208,20 +210,22 @@ export class RequestService {
     connector: ConnectorDefinition,
     config: Record<string, any>,
     files: FileData[],
-    prompt: string
+    prompt: string,
+    parameters?: Record<string, any>
   ): ConnectorRequestLog {
     // 如果连接器提供了自定义日志方法，使用它
     if (connector.getRequestLog) {
-      return connector.getRequestLog(config, files, prompt)
+      return connector.getRequestLog(config, files, prompt, parameters)
     }
 
     // 默认实现：提取常见字段
+    const safeParams = this._extractSafeParams(config)
     return {
       endpoint: this._maskUrl(config.apiUrl),
       model: config.model,
       prompt,
       fileCount: files.length,
-      parameters: this._extractSafeParams(config)
+      parameters: { ...safeParams, ...parameters }
     }
   }
 
@@ -289,6 +293,7 @@ export class RequestService {
     config: Record<string, any>,
     files: FileData[],
     prompt: string,
+    parameters: Record<string, any> | undefined,
     timeout: number
   ): Promise<OutputAsset[]> {
     return new Promise<OutputAsset[]>((resolve, reject) => {
@@ -296,7 +301,7 @@ export class RequestService {
         reject(Errors.timeout(`connector:${connector.id}`, timeout))
       }, timeout)
 
-      connector.generate(this._ctx, config, files, prompt)
+      connector.generate(this._ctx, config, files, prompt, parameters)
         .then(result => {
           clearTimeout(timer)
           resolve(result)
@@ -371,6 +376,7 @@ export function createRequestMiddleware(requestService: RequestService) {
         channel.connectorConfig,
         files,
         prompt,
+        context.parameters,
         { timeout: timeoutMs }
       )
 

@@ -293,7 +293,8 @@ export interface ConnectorDefinition {
     ctx: Context,
     config: Record<string, any>,
     files: FileData[],
-    prompt: string
+    prompt: string,
+    parameters?: Record<string, any>
   ) => Promise<OutputAsset[]>
 
   /**
@@ -304,7 +305,8 @@ export interface ConnectorDefinition {
   getRequestLog?: (
     config: Record<string, any>,
     files: FileData[],
-    prompt: string
+    prompt: string,
+    parameters?: Record<string, any>
   ) => ConnectorRequestLog
 
   /**

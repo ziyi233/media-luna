@@ -6,6 +6,7 @@ import { StructuredTool } from '@langchain/core/tools'
 import { z } from 'zod'
 import { CallbackManagerForToolRun } from '@langchain/core/callbacks/manager'
 import type { ToolConfig, PresetToolConfig } from './config'
+import { formatGenerationResult } from '../koishi-commands/shared/delivery'
 
 // 存储注册的工具 dispose 函数
 const toolDisposers: (() => void)[] = []
@@ -409,7 +410,7 @@ class MediaLunaGenerateTool extends StructuredTool {
     const prepareInfo = raceResult as { type: 'prepared'; hints: string[] }
 
     // 后台继续等待生成完成并发送结果
-    this.handleAsyncResult(generationPromise, session)
+    this.handleAsyncResult(generationPromise, session, channelName)
 
     // 构建返回信息
     const infoParts: string[] = []
@@ -439,7 +440,8 @@ class MediaLunaGenerateTool extends StructuredTool {
    */
   private async handleAsyncResult(
     generationPromise: Promise<any>,
-    session: Session | undefined
+    session: Session | undefined,
+    channelName?: string
   ): Promise<void> {
     try {
       const result = await generationPromise
@@ -459,34 +461,23 @@ class MediaLunaGenerateTool extends StructuredTool {
       }
 
       // 构建合并消息：图片/视频/音频 + 文字信息
-      const messageParts: string[] = []
+      if (session) {
+        const mediaLuna = (this.ctx as any).mediaLuna
+        const channel = channelName && mediaLuna?.channels
+          ? await mediaLuna.channels.getByName(channelName)
+          : null
+        const channelTags: string[] = Array.isArray(channel?.tags) ? channel.tags : []
+        const koishiCommandsConfig = mediaLuna?.configService?.get?.('plugin:koishi-commands', {}) || {}
 
-      // 添加媒体内容
-      for (const asset of result.output) {
-        if (asset.kind === 'image' && asset.url) {
-          messageParts.push(`<image url="${asset.url}"/>`)
-        } else if (asset.kind === 'video' && asset.url) {
-          messageParts.push(`<video url="${asset.url}"/>`)
-        } else if (asset.kind === 'audio' && asset.url) {
-          messageParts.push(`<audio url="${asset.url}"/>`)
+        const content = formatGenerationResult(result, {
+          config: koishiCommandsConfig,
+          platform: session.bot?.platform,
+          channelTags,
+          channelName
+        })
+        if (content) {
+          await session.send(content)
         }
-      }
-
-      // 添加耗时和计费信息
-      const infoParts: string[] = []
-      if (result.duration) {
-        infoParts.push(`耗时 ${(result.duration / 1000).toFixed(1)}s`)
-      }
-      if (result.hints?.after && result.hints.after.length > 0) {
-        infoParts.push(...result.hints.after)
-      }
-      if (infoParts.length > 0) {
-        messageParts.push(infoParts.join(' | '))
-      }
-
-      // 合并发送
-      if (session && messageParts.length > 0) {
-        await session.send(messageParts.join('\n'))
       }
     } catch (e) {
       this.logger.error(`[MediaLunaTool] Async generation error:`, e)

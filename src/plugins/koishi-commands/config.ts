@@ -68,7 +68,7 @@ export const koishiCommandsConfigFields: ConfigField[] = [
     label: '直接触发图片数',
     type: 'number',
     default: 2,
-    description: '图片数量达到此值时直接触发生成，否则进入收集模式'
+    description: '图片数量达到此值时直接触发生成，否则进入收集模式。可用渠道标签覆盖：direct:1 / direct-trigger:1 / directTriggerImageCount:1'
   },
   {
     key: 'linkModeEnabled',

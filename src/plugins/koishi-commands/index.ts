@@ -8,6 +8,7 @@ import {
   defaultKoishiCommandsConfig,
   type KoishiCommandsConfig
 } from './config'
+import { formatGenerationResult, resolveLinkMode } from './shared/delivery'
 import type { FileData, GenerationResult, OutputAsset } from '../../types'
 import { h, type Session } from 'koishi'
 
@@ -17,6 +18,50 @@ interface CollectState {
   processedUrls: Set<string>
   prompts: string[]
   presetName?: string
+}
+
+type CapabilityKey = 'img2img' | 'img2video' | 'text2img' | 'text2video' | 'text2audio'
+
+const CAPABILITY_GROUPS: Array<{ key: CapabilityKey; label: string }> = [
+  { key: 'img2img', label: '图生图' },
+  { key: 'img2video', label: '图生视频' },
+  { key: 'text2img', label: '文生图' },
+  { key: 'text2video', label: '文生视频' },
+  { key: 'text2audio', label: '文生音频' }
+]
+
+const CAPABILITY_KEYS = new Set<CapabilityKey>(CAPABILITY_GROUPS.map(group => group.key))
+
+/**
+ * 从渠道标签解析“直接触发所需图片数”覆盖值。
+ * 支持标签格式（不区分大小写）：
+ * - direct:1
+ * - direct-trigger:1
+ * - directTriggerImageCount:1
+ */
+function resolveDirectTriggerImageCount(channelTags: string[], fallback: number): number {
+  for (const rawTag of channelTags || []) {
+    const tag = String(rawTag).trim()
+    const lowerTag = tag.toLowerCase()
+
+    const patterns = [
+      /^direct:(\d+)$/i,
+      /^direct-trigger:(\d+)$/i,
+      /^directtriggerimagecount:(\d+)$/i
+    ]
+
+    for (const pattern of patterns) {
+      const match = lowerTag.match(pattern)
+      if (match?.[1]) {
+        const parsed = Number(match[1])
+        if (Number.isInteger(parsed) && parsed >= 0) {
+          return parsed
+        }
+      }
+    }
+  }
+
+  return fallback
 }
 
 export default definePlugin({
@@ -300,40 +345,165 @@ export default definePlugin({
       presetCommandDisposables.push(() => presetCmd.dispose())
 
       // medialuna.models - 查看可用模型
-      const modelsCmd = ctx.command(`${PARENT_COMMAND}.models`, '查看可用模型')
+      const modelsCmd = ctx.command(`${PARENT_COMMAND}.models [mode:string]`, '查看可用模型')
         .alias('models')
-        .action(async () => {
+        .action(async (_argv, mode?: string) => {
           const channels = await mediaLunaRef.channels.listEnabled()
 
           if (!channels || channels.length === 0) {
             return '没有可用的模型'
           }
 
-          const lines: string[] = []
-          lines.push('可用模型')
-          lines.push('')
-
-          for (const channel of channels) {
-            let line = `  ${channel.name}`
-
-            if (channel.tags && channel.tags.length > 0) {
-              line += `  #${channel.tags.join(' #')}`
-            }
-
-            const cost = channel.pluginOverrides?.billing?.cost
-            if (cost !== undefined && cost > 0) {
-              const currencyLabel = channel.pluginOverrides?.billing?.currencyLabel || '积分'
-              line += `  ${cost}${currencyLabel}/次`
-            } else if (cost === 0) {
-              line += '  免费'
-            }
-
-            lines.push(line)
+          const normalizedMode = (mode || '').trim().toLowerCase()
+          const validModes = new Set(['all', 'dedupe', ...Array.from(CAPABILITY_KEYS)])
+          if (normalizedMode && !validModes.has(normalizedMode)) {
+            return [
+              `未知模式: ${mode}`,
+              '可选模式: all, dedupe, text2img, img2img, text2audio, text2video, img2video'
+            ].join('\n')
           }
 
+          const toCapabilityLabel = (key: CapabilityKey) => CAPABILITY_GROUPS.find(group => group.key === key)?.label || key
+
+          const getChannelCapabilities = (channel: any): CapabilityKey[] => {
+            const channelTags = Array.isArray(channel.tags) ? channel.tags : []
+            return CAPABILITY_GROUPS
+              .map(group => group.key)
+              .filter(key => channelTags.includes(key))
+          }
+
+          const getExtraTags = (channel: any): string[] => {
+            const channelTags = Array.isArray(channel.tags) ? channel.tags : []
+            return channelTags.filter((tag: string) => !CAPABILITY_KEYS.has(tag as CapabilityKey))
+          }
+
+          const getCostInfo = (channel: any): string => {
+            const cost = channel.pluginOverrides?.billing?.cost
+            if (cost === 0) return '免费'
+            if (cost !== undefined && cost > 0) {
+              const currencyLabel = channel.pluginOverrides?.billing?.currencyLabel || '积分'
+              return `${cost}${currencyLabel}/次`
+            }
+            return '未配置计费'
+          }
+
+          const getPrimaryCapability = (channel: any): CapabilityKey | null => {
+            const capabilities = getChannelCapabilities(channel)
+            return capabilities[0] || null
+          }
+
+          const formatChannelLine = (channel: any, primaryCapability?: CapabilityKey | null): string => {
+            const parts: string[] = [channel.name]
+            parts.push(getCostInfo(channel))
+
+            if (primaryCapability) {
+              parts.push(`主能力:${toCapabilityLabel(primaryCapability)}`)
+            }
+
+            const extraTags = getExtraTags(channel)
+            if (extraTags.length > 0) {
+              const shown = extraTags.slice(0, 2)
+              const hiddenCount = extraTags.length - shown.length
+              parts.push(`附加:${shown.join(', ')}${hiddenCount > 0 ? ` +${hiddenCount}` : ''}`)
+            }
+
+            return `  ${parts.join('  |  ')}`
+          }
+
+          const compareChannels = (a: any, b: any): number => {
+            const aCost = a.pluginOverrides?.billing?.cost
+            const bCost = b.pluginOverrides?.billing?.cost
+
+            const normalizeCost = (cost: any) => {
+              if (cost === 0) return 0
+              if (typeof cost === 'number' && cost > 0) return cost
+              return Number.MAX_SAFE_INTEGER
+            }
+
+            const diff = normalizeCost(aCost) - normalizeCost(bCost)
+            if (diff !== 0) return diff
+            return String(a.name).localeCompare(String(b.name), 'zh-CN')
+          }
+
+          const channelByCapability = new Map<CapabilityKey, any[]>()
+          for (const group of CAPABILITY_GROUPS) {
+            channelByCapability.set(group.key, [])
+          }
+
+          for (const channel of channels) {
+            const capabilities = getChannelCapabilities(channel)
+            for (const key of capabilities) {
+              channelByCapability.get(key)?.push(channel)
+            }
+          }
+
+          const lines: string[] = []
+          lines.push('可用模型（按能力分组）')
           lines.push('')
-          lines.push(`共 ${channels.length} 个模型`)
+
+          if (normalizedMode === 'dedupe') {
+            lines.push('模式: 去重（图输入优先）')
+            lines.push('')
+
+            const grouped = new Map<CapabilityKey, any[]>()
+            for (const group of CAPABILITY_GROUPS) {
+              grouped.set(group.key, [])
+            }
+
+            for (const channel of channels) {
+              const primary = getPrimaryCapability(channel)
+              if (!primary) continue
+              grouped.get(primary)?.push(channel)
+            }
+
+            for (const group of CAPABILITY_GROUPS) {
+              const list = (grouped.get(group.key) || []).sort(compareChannels)
+              if (list.length === 0) continue
+              lines.push(`【${group.label}】`)
+              for (const channel of list) {
+                lines.push(formatChannelLine(channel, group.key))
+              }
+              lines.push('')
+            }
+          } else {
+            const targetGroups = normalizedMode && normalizedMode !== 'all'
+              ? CAPABILITY_GROUPS.filter(group => group.key === normalizedMode)
+              : CAPABILITY_GROUPS
+
+            for (const group of targetGroups) {
+              const list = (channelByCapability.get(group.key) || []).sort(compareChannels)
+              if (list.length === 0) continue
+
+              lines.push(`【${group.label}】`) 
+              for (const channel of list) {
+                const primary = getPrimaryCapability(channel)
+                lines.push(formatChannelLine(channel, primary))
+              }
+              lines.push('')
+            }
+          }
+
+          if (lines[lines.length - 1] === '') {
+            lines.pop()
+          }
+
+          const uniqueCount = new Set(channels.map((channel: any) => channel.id)).size
+          const allCapabilityCount = CAPABILITY_GROUPS.reduce(
+            (sum, group) => sum + (channelByCapability.get(group.key)?.length || 0),
+            0
+          )
+
+          lines.push('')
+          if (normalizedMode === 'dedupe') {
+            lines.push(`共 ${uniqueCount} 个模型（去重）`)
+          } else if (normalizedMode && normalizedMode !== 'all') {
+            const matched = channelByCapability.get(normalizedMode as CapabilityKey)?.length || 0
+            lines.push(`共 ${matched} 个模型（${toCapabilityLabel(normalizedMode as CapabilityKey)}）`)
+          } else {
+            lines.push(`共 ${uniqueCount} 个模型（分组累计 ${allCapabilityCount}，同一模型可出现在多个分组）`)
+          }
           lines.push('用法: 模型名 [预设名] 提示词')
+          lines.push('筛选: medialuna.models <all|dedupe|text2img|img2img|text2audio|text2video|img2video>')
 
           const content = lines.join('\n')
 
@@ -568,10 +738,10 @@ export default definePlugin({
         })
       presetCommandDisposables.push(() => taskDetailCmd.dispose())
 
-      // medialuna.redraw <id> - 重绘任务
-      const redrawCmd = ctx.command(`${PARENT_COMMAND}.redraw <id:number>`, '使用相同参数重新生成')
+      // medialuna.redraw <id> [追加提示词] - 重绘任务
+      const redrawCmd = ctx.command(`${PARENT_COMMAND}.redraw <id:number> [...appendPrompt:string]`, '使用相同参数重新生成（可追加提示词）')
         .alias('redraw')
-        .action(async ({ session }: { session?: Session }, id: number) => {
+        .action(async ({ session }: { session?: Session }, id: number, ...appendPromptParts: string[]) => {
           if (!id && id !== 0) {
             return '请指定任务 ID'
           }
@@ -613,7 +783,11 @@ export default definePlugin({
 
           // 提取任务参数
           const request = task.requestSnapshot
-          const prompt = request?.prompt || ''
+          const originalPrompt = request?.prompt || ''
+          const appendPrompt = appendPromptParts.join(' ').trim()
+          const prompt = appendPrompt
+            ? (originalPrompt ? `${originalPrompt} ${appendPrompt}` : appendPrompt)
+            : originalPrompt
           const presetName = request?.parameters?.preset
           const inputFiles = (request as any)?.inputFiles as OutputAsset[] | undefined
 
@@ -665,10 +839,12 @@ export default definePlugin({
             }
           }
 
-          // 发送提示
           const infoParts = [`重绘任务「${taskId}」`]
           infoParts.push(`渠道: ${channel.name}`)
           if (presetName) infoParts.push(`预设: ${presetName}`)
+          if (appendPrompt) {
+            infoParts.push(`追加: ${appendPrompt.length > 30 ? appendPrompt.slice(0, 30) + '...' : appendPrompt}`)
+          }
           infoParts.push(`提示词: ${prompt.length > 30 ? prompt.slice(0, 30) + '...' : prompt}`)
           if (files.length > 0) {
             infoParts.push(`参考图: ${files.length} 张`)
@@ -676,37 +852,13 @@ export default definePlugin({
             infoParts.push(`⚠️ ${inputFileWarning}`)
           }
 
-          const hintMsgIds = await session?.send(infoParts.join(' | ') + '\n正在生成中...')
-
-          try {
-            // 执行生成
-            const result = await mediaLunaRef.generate({
-              channel: channel.id,
-              prompt,
-              files,
-              parameters: { preset: presetName },
-              session,
-              uid
-            })
-
-            // 删除提示消息
-            if (session && hintMsgIds) {
-              await deleteMessages(session, hintMsgIds)
-            }
-
-            // 检查链接模式
-            const channelTags: string[] = channel.tags || []
-            const linkModeTag = checkLinkMode(config, channelTags, session?.bot?.platform)
-
-            return formatResult(result, linkModeTag, config, null, channel.name)
-          } catch (error) {
-            // 删除提示消息
-            if (session && hintMsgIds) {
-              await deleteMessages(session, hintMsgIds)
-            }
-            logger.error('Redraw failed: %s', error)
-            return `重绘失败: ${error instanceof Error ? error.message : '未知错误'}`
-          }
+          return executeGenerate(ctx, session, mediaLunaRef, {
+            channelName: channel.name,
+            presetName,
+            prompt,
+            files,
+            summaryMsg: infoParts.join(' | ')
+          }, config, channel.tags || [])
         })
       presetCommandDisposables.push(() => redrawCmd.dispose())
 
@@ -845,8 +997,9 @@ function registerChannelCommand(
 
       // 以下是需要媒体输入的渠道（img2xxx/video2xxx 类型）
 
-      // 判断是否直接触发
-      if (state.files.length >= config.directTriggerImageCount) {
+      // 判断是否直接触发（渠道标签优先于全局配置）
+      const directTriggerCount = resolveDirectTriggerImageCount(channelTags, config.directTriggerImageCount)
+      if (state.files.length >= directTriggerCount) {
         // 图片数量足够，直接生成
         return executeGenerateWithPresetCheck(ctx, session, channel, state, mediaLuna, config)
       }
@@ -1583,7 +1736,7 @@ async function executeGenerate(
     }
 
     // 检查是否需要使用链接模式（返回匹配的标签名或 null）
-    const linkModeTag = checkLinkMode(config, channelTags, session?.bot?.platform)
+    const linkModeTag = resolveLinkMode(config, channelTags, session?.bot?.platform)
 
     // 查询上次成功生成时间（无论本次成功失败都显示）
     let lastSuccessTime: Date | null = null
@@ -1608,7 +1761,14 @@ async function executeGenerate(
       }
     }
 
-    return formatResult(result, linkModeTag, config, lastSuccessTime, options.channelName)
+    return formatGenerationResult(result, {
+      config,
+      channelTags,
+      platform: session?.bot?.platform,
+      channelName: options.channelName,
+      lastSuccessTime,
+      linkModeTag
+    })
   } catch (error) {
     // 撤销"正在生成中"消息
     if (session && generatingMsgIds) {
@@ -1617,284 +1777,6 @@ async function executeGenerate(
 
     logger.error('Generate failed: %s', error)
     return `生成失败: ${error instanceof Error ? error.message : '未知错误'}`
-  }
-}
-
-/**
- * 检查是否应该使用链接模式
- * 返回匹配的标签（用于显示原因），如果不匹配则返回 null
- */
-function checkLinkMode(config: KoishiCommandsConfig, channelTags: string[], platform?: string): string | null {
-  if (!config.linkModeEnabled) return null
-  if (!config.linkModeTags || typeof config.linkModeTags !== 'string' || !channelTags.length) return null
-
-  // 检查当前平台是否在排除列表中
-  if (platform && config.linkModeExcludePlatforms) {
-    const excludePlatforms = config.linkModeExcludePlatforms.split(',').map(p => p.trim().toLowerCase()).filter(Boolean)
-    if (excludePlatforms.includes(platform.toLowerCase())) return null
-  }
-
-  // 解析配置的标签（逗号分隔）
-  const linkTags = config.linkModeTags.split(',').map(t => t.trim().toLowerCase()).filter(Boolean)
-  if (linkTags.length === 0) return null
-
-  // 检查渠道标签是否包含任意一个链接模式标签
-  const channelTagsLower = channelTags.map(t => t.toLowerCase())
-  for (const tag of linkTags) {
-    if (channelTagsLower.includes(tag)) {
-      // 返回原始大小写的标签
-      const originalIndex = channelTagsLower.indexOf(tag)
-      return channelTags[originalIndex]
-    }
-  }
-  return null
-}
-
-/**
- * 格式化生成结果
- * 根据输出类型使用不同的展示方式：
- * - 图片/文本：常规格式，带任务ID和计费信息
- * - 视频：使用合并转发消息
- * - 纯音频：只发送音频元素，不带任务ID和计费信息
- * - 链接模式：使用合并转发消息，输出链接而不是直接发图
- */
-function formatResult(
-  result: GenerationResult,
-  linkModeTag: string | null = null,
-  config?: KoishiCommandsConfig,
-  lastSuccessTime?: Date | null,
-  channelName?: string
-): string {
-  const outputTextContent = config?.outputTextContent ?? false
-
-  // 格式化上次成功时间信息（包含渠道名和中国时间）
-  const lastSuccessInfo = lastSuccessTime && channelName
-    ? `「${channelName}」上次成功: ${formatChinaTime(lastSuccessTime)}`
-    : null
-  // 失败情况：始终显示任务ID和错误信息
-  if (!result.success) {
-    const messages: string[] = []
-    if (result.taskId) {
-      messages.push(`「${result.taskId}」`)
-    }
-    messages.push(`生成失败: ${result.error || '未知错误'}`)
-    appendFooterInfo(messages, result, lastSuccessInfo)
-    return messages.join('\n')
-  }
-
-  // 无输出情况
-  if (!result.output || result.output.length === 0) {
-    const messages: string[] = []
-    if (result.taskId) {
-      messages.push(`「${result.taskId}」`)
-    }
-    messages.push(`生成完成，但没有输出`)
-    appendFooterInfo(messages, result, lastSuccessInfo)
-    return messages.join('\n')
-  }
-
-  // 分析输出类型
-  const hasVideo = result.output.some(a => a.kind === 'video' && a.url)
-  const hasAudio = result.output.some(a => a.kind === 'audio' && a.url)
-  const hasImage = result.output.some(a => a.kind === 'image' && a.url)
-  const hasText = outputTextContent && result.output.some(a => a.kind === 'text' && a.content)
-
-  // 纯音频输出：只发送音频元素，不带任何附加信息
-  if (hasAudio && !hasVideo && !hasImage && !hasText) {
-    const audioElements: string[] = []
-    for (const asset of result.output) {
-      if (asset.kind === 'audio' && asset.url) {
-        audioElements.push(`<audio url="${asset.url}"/>`)
-      }
-    }
-    return audioElements.join('\n')
-  }
-
-  // 包含视频：使用合并转发消息
-  if (hasVideo) {
-    return formatVideoResult(result, linkModeTag, outputTextContent, lastSuccessInfo)
-  }
-
-  // 链接模式：使用合并转发消息，每个链接单独一条方便复制
-  if (linkModeTag) {
-    return formatLinkModeResult(result, linkModeTag, outputTextContent, lastSuccessInfo)
-  }
-
-  // 常规输出：图片/文本，带任务ID和计费信息
-  return formatStandardResult(result, outputTextContent, lastSuccessInfo)
-}
-
-/**
- * 格式化视频输出（使用合并转发消息）
- */
-function formatVideoResult(
-  result: GenerationResult,
-  linkModeTag: string | null = null,
-  outputTextContent: boolean = false,
-  lastSuccessInfo: string | null = null
-): string {
-  const forwardMessages: string[] = []
-
-  // 第一条消息：任务信息
-  const infoLines: string[] = []
-  if (result.taskId) {
-    infoLines.push(`任务「${result.taskId}」`)
-  }
-  if (result.duration) {
-    infoLines.push(`耗时 ${formatDuration(result.duration)}`)
-  }
-  if (result.hints?.after && result.hints.after.length > 0) {
-    infoLines.push(...result.hints.after)
-  }
-  if (infoLines.length > 0) {
-    forwardMessages.push(`<message>${infoLines.join(' | ')}</message>`)
-  }
-
-  // 上次成功时间（单独一条消息）
-  if (lastSuccessInfo) {
-    forwardMessages.push(`<message>${lastSuccessInfo}</message>`)
-  }
-
-  // 链接模式说明
-  if (linkModeTag) {
-    forwardMessages.push(`<message>📎 因渠道标签 [${linkModeTag}] 启用链接模式</message>`)
-  }
-
-  // 输出内容
-  for (const asset of result.output!) {
-    if (asset.kind === 'video' && asset.url) {
-      if (linkModeTag) {
-        forwardMessages.push(`<message>${asset.url}</message>`)
-      } else {
-        forwardMessages.push(`<message><video url="${asset.url}"/></message>`)
-      }
-    } else if (asset.kind === 'image' && asset.url) {
-      if (linkModeTag) {
-        forwardMessages.push(`<message>${asset.url}</message>`)
-      } else {
-        forwardMessages.push(`<message><image url="${asset.url}"/></message>`)
-      }
-    } else if (asset.kind === 'audio' && asset.url) {
-      forwardMessages.push(`<message><audio url="${asset.url}"/></message>`)
-    } else if (outputTextContent && asset.kind === 'text' && asset.content) {
-      forwardMessages.push(`<message>${asset.content}</message>`)
-    }
-  }
-
-  return `<message forward>${forwardMessages.join('')}</message>`
-}
-
-/**
- * 格式化链接模式输出（使用合并转发消息，每个链接单独一条方便复制）
- */
-function formatLinkModeResult(
-  result: GenerationResult,
-  linkModeTag: string,
-  outputTextContent: boolean = false,
-  lastSuccessInfo: string | null = null
-): string {
-  const forwardMessages: string[] = []
-
-  // 第一条消息：任务信息
-  const infoLines: string[] = []
-  if (result.taskId) {
-    infoLines.push(`任务「${result.taskId}」`)
-  }
-  if (result.duration) {
-    infoLines.push(`耗时 ${formatDuration(result.duration)}`)
-  }
-  if (result.hints?.after && result.hints.after.length > 0) {
-    infoLines.push(...result.hints.after)
-  }
-  if (infoLines.length > 0) {
-    forwardMessages.push(`<message>${infoLines.join(' | ')}</message>`)
-  }
-
-  // 上次成功时间（单独一条消息）
-  if (lastSuccessInfo) {
-    forwardMessages.push(`<message>${lastSuccessInfo}</message>`)
-  }
-
-  // 链接模式说明
-  forwardMessages.push(`<message>📎 因渠道标签 [${linkModeTag}] 启用链接模式</message>`)
-
-  // 输出内容：每个链接单独一条消息
-  for (const asset of result.output!) {
-    if (asset.kind === 'image' && asset.url) {
-      forwardMessages.push(`<message>${asset.url}</message>`)
-    } else if (asset.kind === 'video' && asset.url) {
-      forwardMessages.push(`<message>${asset.url}</message>`)
-    } else if (asset.kind === 'audio' && asset.url) {
-      forwardMessages.push(`<message><audio url="${asset.url}"/></message>`)
-    } else if (outputTextContent && asset.kind === 'text' && asset.content) {
-      forwardMessages.push(`<message>${asset.content}</message>`)
-    }
-  }
-
-  return `<message forward>${forwardMessages.join('')}</message>`
-}
-
-/**
- * 格式化标准输出（图片/文本）
- */
-function formatStandardResult(
-  result: GenerationResult,
-  outputTextContent: boolean = false,
-  lastSuccessInfo: string | null = null
-): string {
-  const messages: string[] = []
-
-  // 任务 ID 放在最开始
-  if (result.taskId) {
-    messages.push(`「${result.taskId}」`)
-  }
-
-  // 构建输出消息
-  for (const asset of result.output!) {
-    if (asset.kind === 'image' && asset.url) {
-      messages.push(`<image url="${asset.url}"/>`)
-    } else if (asset.kind === 'audio' && asset.url) {
-      messages.push(`<audio url="${asset.url}"/>`)
-    } else if (asset.kind === 'video' && asset.url) {
-      messages.push(`<video url="${asset.url}"/>`)
-    } else if (outputTextContent && asset.kind === 'text' && asset.content) {
-      messages.push(asset.content)
-    }
-  }
-
-  // 底部信息
-  appendFooterInfo(messages, result, lastSuccessInfo)
-
-  return messages.join('\n')
-}
-
-/**
- * 添加底部信息（耗时、计费等）
- */
-function appendFooterInfo(
-  messages: string[],
-  result: GenerationResult,
-  lastSuccessInfo: string | null = null
-): void {
-  const footerParts: string[] = []
-
-  // 耗时
-  if (result.duration) {
-    footerParts.push(`耗时 ${formatDuration(result.duration)}`)
-  }
-
-  // 计费信息（来自中间件）
-  if (result.hints?.after && result.hints.after.length > 0) {
-    footerParts.push(...result.hints.after)
-  }
-
-  if (footerParts.length > 0) {
-    messages.push(footerParts.join(' | '))
-  }
-
-  // 上次成功时间（单独一行）
-  if (lastSuccessInfo) {
-    messages.push(lastSuccessInfo)
   }
 }
 
@@ -1908,23 +1790,6 @@ function formatDuration(ms: number): string {
   const minutes = Math.floor(seconds / 60)
   const remainingSeconds = (seconds % 60).toFixed(0)
   return `${minutes}m ${remainingSeconds}s`
-}
-
-/**
- * 格式化为中国时间（UTC+8）
- */
-function formatChinaTime(date: Date): string {
-  // 使用 toLocaleString 格式化为中国时间
-  return date.toLocaleString('zh-CN', {
-    timeZone: 'Asia/Shanghai',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: false
-  })
 }
 
 // 导出类型

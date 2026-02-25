@@ -1000,6 +1000,13 @@ function registerChannelCommand(
       // 判断是否直接触发（渠道标签优先于全局配置）
       const directTriggerCount = resolveDirectTriggerImageCount(channelTags, config.directTriggerImageCount)
       if (state.files.length >= directTriggerCount) {
+        const extractResult = extractor.getResult()
+        if (extractResult.failed > 0) {
+          return [
+            `检测到素材收集失败（成功 ${state.files.length} / 失败 ${extractResult.failed}），已取消本次生成。`,
+            '请重新发送命令和图片再试。'
+          ].join('\n')
+        }
         // 图片数量足够，直接生成
         return executeGenerateWithPresetCheck(ctx, session, channel, state, mediaLuna, config)
       }

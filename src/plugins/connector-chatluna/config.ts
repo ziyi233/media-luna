@@ -38,6 +38,20 @@ export interface PresetToolConfig {
   description: string
 }
 
+/** 任务查询工具配置 */
+export interface TaskQueryToolConfig {
+  /** 是否启用内部任务查询工具 */
+  enabled: boolean
+  /** 工具名称 */
+  name: string
+  /** 默认等待超时（毫秒） */
+  defaultWaitMs: number
+  /** 最大允许等待超时（毫秒） */
+  maxWaitMs: number
+  /** 轮询间隔（毫秒） */
+  pollIntervalMs: number
+}
+
 /** 插件配置 */
 export interface ChatLunaPluginConfig {
   /** 是否启用工具注册 */
@@ -46,6 +60,8 @@ export interface ChatLunaPluginConfig {
   tools: ToolConfig[]
   /** 预设查看工具配置 */
   presetTool: PresetToolConfig
+  /** 任务查询工具配置 */
+  taskQueryTool: TaskQueryToolConfig
   /** 是否启用变量注册 */
   enableVariables: boolean
   /** 提示词润色配置 */
@@ -126,6 +142,47 @@ export const chatlunaConfigFields: ConfigField[] = [
     showWhen: { field: 'enableTools', value: true }
   },
   {
+    key: 'taskQueryTool.enabled',
+    label: '启用任务查询工具',
+    type: 'boolean',
+    default: true,
+    description: '注册任务查询工具（供 task 模式工具按 taskId 查询状态和结果）',
+    showWhen: { field: 'enableTools', value: true }
+  },
+  {
+    key: 'taskQueryTool.name',
+    label: '任务查询工具名称',
+    type: 'text',
+    default: 'medialuna_query_tasks',
+    placeholder: 'medialuna_query_tasks',
+    description: '内部任务查询工具的名称（sync/task 模式会在描述里引用）',
+    showWhen: { field: 'taskQueryTool.enabled', value: true }
+  },
+  {
+    key: 'taskQueryTool.defaultWaitMs',
+    label: '默认等待超时(ms)',
+    type: 'number',
+    default: 300000,
+    description: '任务查询工具默认等待时间（0=单次快照）。默认 300000（5 分钟）',
+    showWhen: { field: 'taskQueryTool.enabled', value: true }
+  },
+  {
+    key: 'taskQueryTool.maxWaitMs',
+    label: '最大等待超时(ms)',
+    type: 'number',
+    default: 300000,
+    description: '任务查询工具允许的最大等待时间，避免过长阻塞',
+    showWhen: { field: 'taskQueryTool.enabled', value: true }
+  },
+  {
+    key: 'taskQueryTool.pollIntervalMs',
+    label: '轮询间隔(ms)',
+    type: 'number',
+    default: 400,
+    description: '任务查询轮询间隔，越小实时性越好但数据库压力更高',
+    showWhen: { field: 'taskQueryTool.enabled', value: true }
+  },
+  {
     key: 'tools',
     label: '画图工具列表',
     type: 'table',
@@ -159,7 +216,7 @@ export const chatlunaConfigFields: ConfigField[] = [
         label: '返回模式',
         type: 'select',
         options: [
-          { label: '同步（等待完成）', value: 'sync' },
+          { label: '任务模式（立即返回 taskId，需查询）', value: 'sync' },
           { label: '异步（后台生成）', value: 'async' }
         ],
         width: '140px'
@@ -215,6 +272,13 @@ export const defaultConfig: ChatLunaPluginConfig = {
     enabled: true,
     name: 'list_presets',
     description: 'List available presets for image generation. Available presets: {presets}'
+  },
+  taskQueryTool: {
+    enabled: true,
+    name: 'medialuna_query_tasks',
+    defaultWaitMs: 300000,
+    maxWaitMs: 300000,
+    pollIntervalMs: 400
   },
   enableVariables: false,
   promptEnhance: defaultPromptEnhanceConfig

@@ -10,6 +10,25 @@ import { formatGenerationResult } from '../koishi-commands/shared/delivery'
 
 // 存储注册的工具 dispose 函数
 const toolDisposers: (() => void)[] = []
+const DEFAULT_QUERY_TOOL_NAME = 'medialuna_query_tasks'
+
+interface QueryToolRuntimeConfig {
+  name: string
+  defaultWaitMs: number
+  maxWaitMs: number
+  pollIntervalMs: number
+}
+
+let queryToolRuntimeConfig: QueryToolRuntimeConfig = {
+  name: DEFAULT_QUERY_TOOL_NAME,
+  defaultWaitMs: 300000,
+  maxWaitMs: 300000,
+  pollIntervalMs: 400
+}
+
+function getQueryToolName() {
+  return queryToolRuntimeConfig.name || DEFAULT_QUERY_TOOL_NAME
+}
 
 /**
  * 注册 Media Luna 工具到 ChatLuna
@@ -30,6 +49,15 @@ export function registerChatLunaTools(
   // 清理之前注册的工具
   unregisterChatLunaTools()
 
+  const pluginConfig = (ctx as any).mediaLuna?.configService?.get?.('plugin:connector-chatluna', {}) as any
+  const queryConfig = pluginConfig?.taskQueryTool || {}
+  queryToolRuntimeConfig = {
+    name: queryConfig.name || DEFAULT_QUERY_TOOL_NAME,
+    defaultWaitMs: typeof queryConfig.defaultWaitMs === 'number' ? queryConfig.defaultWaitMs : 300000,
+    maxWaitMs: typeof queryConfig.maxWaitMs === 'number' ? queryConfig.maxWaitMs : 300000,
+    pollIntervalMs: typeof queryConfig.pollIntervalMs === 'number' ? queryConfig.pollIntervalMs : 400
+  }
+
   const enabledTools = tools.filter(t => t.enabled)
 
   for (const toolConfig of enabledTools) {
@@ -43,6 +71,21 @@ export function registerChatLunaTools(
     })
     toolDisposers.push(dispose)
     logger.info(`Registered ChatLuna tool: ${toolConfig.name}`)
+  }
+
+  const queryEnabled = queryConfig.enabled !== false
+  if (queryEnabled) {
+    const queryToolName = getQueryToolName()
+    const queryDispose = chatluna.platform.registerTool(queryToolName, {
+      createTool() {
+        return new MediaLunaTaskQueryTool(ctx, logger)
+      },
+      selector(_history: any) {
+        return true
+      }
+    })
+    toolDisposers.push(queryDispose)
+    logger.info(`Registered ChatLuna tool: ${queryToolName}`)
   }
 
   // 注册预设查看工具（如果启用）
@@ -122,6 +165,13 @@ function buildDescription(toolConfig: ToolConfig): string {
 
   if (toolConfig.builtinPreset) {
     desc += ` [Uses preset: ${toolConfig.builtinPreset}]`
+  }
+
+  const queryToolName = getQueryToolName()
+  if (toolConfig.returnMode === 'sync') {
+    desc += ` [Task mode: returns task IDs immediately. MUST call ${queryToolName} to wait and get final status/URLs. ${queryToolName} waits up to 5 minutes by default.]`
+  } else {
+    desc += ' [Async notify mode: result will be sent to user automatically after completion.]'
   }
 
   return desc
@@ -273,44 +323,117 @@ class MediaLunaGenerateTool extends StructuredTool {
     files: any[],
     session: Session | undefined
   ): Promise<string> {
-    const result = await mediaLuna.generateByName({
+    const channel = await mediaLuna.channels?.getByName?.(channelName)
+    const submitAt = new Date()
+
+    let resolvePrepare: (info: { hints: string[] }) => void
+    const preparePromise = new Promise<{ hints: string[] }>((resolve) => {
+      resolvePrepare = resolve
+    })
+
+    let prepareCallbackCalled = false
+
+    const generationPromise = mediaLuna.generateByName({
       channelName,
       prompt,
       files,
       presetName,
       session,
-      uid: (session?.user as any)?.id
+      uid: (session?.user as any)?.id,
+      onPrepareComplete: async (beforeHints: string[]) => {
+        prepareCallbackCalled = true
+        resolvePrepare!({ hints: beforeHints })
+      }
     })
 
-    if (!result.success) {
-      return `Generation failed: ${result.error || 'Unknown error'}`
-    }
+    generationPromise.catch((e: any) => {
+      this.logger.error('[MediaLunaTool] generateSync background error:', e)
+    })
 
-    if (!result.output || result.output.length === 0) {
-      return 'Generation completed but no output was produced'
-    }
-
-    // 处理输出 - 直接返回 URL，不通过 session 发送
-    const outputs: string[] = []
-    for (const asset of result.output) {
-      if (asset.kind === 'image' && asset.url) {
-        outputs.push(asset.url)
-      } else if (asset.kind === 'video' && asset.url) {
-        outputs.push(`[video] ${asset.url}`)
-      } else if (asset.kind === 'text' && asset.content) {
-        outputs.push(asset.content)
+    const generationRacePromise = generationPromise.then((result: any) => {
+      if (prepareCallbackCalled) return null
+      if (!result.success) {
+        return { type: 'failed' as const, error: result.error || '生成失败' }
       }
+      return { type: 'success' as const, result }
+    })
+
+    const timeoutPromise = new Promise<{ type: 'timeout' }>((resolve) => {
+      setTimeout(() => resolve({ type: 'timeout' }), 10000)
+    })
+
+    const prepareRacePromise = preparePromise.then((info) => ({
+      type: 'prepared' as const,
+      hints: info.hints
+    }))
+
+    const raceResult = await Promise.race([
+      prepareRacePromise,
+      generationRacePromise,
+      timeoutPromise
+    ])
+
+    if (raceResult !== null && raceResult.type === 'failed') {
+      return `[TASK FAILED] ${raceResult.error}`
+    }
+    if (raceResult !== null && raceResult.type === 'timeout') {
+      return '[TASK FAILED] 准备阶段超时'
+    }
+    if (raceResult !== null && raceResult.type === 'success') {
+      const result = raceResult.result
+      if (!result?.taskId) {
+        return '[TASK SUBMITTED] 任务已完成，但未返回 taskId'
+      }
+      return JSON.stringify({
+        ok: true,
+        mode: 'manual',
+        tasks: [{ index: 1, taskId: result.taskId }],
+        message: `Task finished quickly. Query with ${getQueryToolName()} if needed.`
+      })
     }
 
-    if (outputs.length === 0) {
-      return 'Image generated successfully but no displayable output'
+    const taskId = await this.resolveTaskId(mediaLuna, {
+      uid: (session?.user as any)?.id,
+      channelId: channel?.id,
+      prompt,
+      submitAt
+    })
+
+    const hints = (raceResult as any)?.hints as string[] | undefined
+
+    return JSON.stringify({
+      ok: true,
+      mode: 'manual',
+      tasks: taskId ? [{ index: 1, taskId }] : [],
+      info: hints || [],
+      message: taskId
+        ? `Task submitted. MUST call ${getQueryToolName()} with this taskId to wait for final result URLs (default wait: 5 minutes).`
+        : `Task submitted but taskId not resolved yet. Retry ${getQueryToolName()} after a short delay.`
+    })
+  }
+
+  private async resolveTaskId(
+    mediaLuna: any,
+    options: { uid?: number; channelId?: number; prompt: string; submitAt: Date }
+  ): Promise<number | null> {
+    const taskService = mediaLuna?.tasks
+    if (!taskService) return null
+
+    const deadline = Date.now() + 5000
+    while (Date.now() < deadline) {
+      const tasks = await taskService.query({ uid: options.uid, channelId: options.channelId, limit: 20 })
+      const matched = tasks.find((task: any) => {
+        const startTime = task.startTime ? new Date(task.startTime).getTime() : 0
+        const reqPrompt = task.requestSnapshot?.prompt
+        return startTime >= options.submitAt.getTime() - 2000 && reqPrompt === options.prompt
+      })
+
+      if (matched?.id) return matched.id
+
+      await new Promise(resolve => setTimeout(resolve, 250))
     }
 
-    // 返回格式：明确告知生成完成和结果
-    if (outputs.length === 1) {
-      return `Image generated successfully. URL: ${outputs[0]}`
-    }
-    return `Generated ${outputs.length} outputs:\n${outputs.map((url, i) => `${i + 1}. ${url}`).join('\n')}`
+    return null
   }
 
   /**
@@ -325,6 +448,9 @@ class MediaLunaGenerateTool extends StructuredTool {
     files: any[],
     session: Session | undefined
   ): Promise<string> {
+    const channel = await mediaLuna.channels?.getByName?.(channelName)
+    const submitAt = new Date()
+
     // 用于在 prepare 完成时 resolve 的 Promise
     let resolvePrepare: (info: { hints: string[] }) => void
     const preparePromise = new Promise<{ hints: string[] }>((resolve) => {
@@ -347,6 +473,13 @@ class MediaLunaGenerateTool extends StructuredTool {
         prepareCallbackCalled = true
         resolvePrepare!({ hints: beforeHints })
       }
+    })
+
+    const taskIdPromise = this.resolveTaskId(mediaLuna, {
+      uid: (session?.user as any)?.id,
+      channelId: channel?.id,
+      prompt,
+      submitAt
     })
 
     // 将 generationPromise 也转换为可以 race 的 Promise
@@ -397,17 +530,23 @@ class MediaLunaGenerateTool extends StructuredTool {
       // 罕见：没有 prepare 回调但生成成功了
       // 这种情况下不需要后台处理，直接返回结果
       const result = raceResult.result
-      if (result.output?.length > 0) {
-        const urls = result.output
-          .filter((a: any) => a.url)
-          .map((a: any) => a.url)
-        return `Image generated successfully. URLs: ${urls.join(', ')}`
-      }
-      return 'Image generated but no output'
+      const quickTaskId = result?.taskId || await taskIdPromise
+      return JSON.stringify({
+        ok: true,
+        mode: 'notify',
+        tasks: quickTaskId ? [{ index: 1, taskId: quickTaskId }] : [],
+        channel: channelName,
+        preset: presetName,
+        message: quickTaskId
+          ? 'Task finished quickly. Result may already be available in task query.'
+          : `Task finished quickly but taskId not resolved. Query with ${getQueryToolName()}.`
+      })
     }
 
     // type === 'prepared'，prepare 阶段成功完成
     const prepareInfo = raceResult as { type: 'prepared'; hints: string[] }
+
+    const taskId = await taskIdPromise
 
     // 后台继续等待生成完成并发送结果
     this.handleAsyncResult(generationPromise, session, channelName)
@@ -420,18 +559,17 @@ class MediaLunaGenerateTool extends StructuredTool {
       infoParts.push(prepareInfo.hints.join('; '))
     }
 
-    // 返回明确的状态信息
-    const statusInfo = [
-      `[TASK STARTED]`,
-      `Channel: ${channelName}`,
-      presetName ? `Preset: ${presetName}` : null,
-      infoParts.length > 0 ? `Info: ${infoParts.join(', ')}` : null,
-      `The image is now being generated in the background.`,
-      `The result will be sent directly to the user when complete.`,
-      `DO NOT call this tool again for the same request.`
-    ].filter(Boolean).join(' ')
-
-    return statusInfo
+    return JSON.stringify({
+      ok: true,
+      mode: 'notify',
+      tasks: taskId ? [{ index: 1, taskId }] : [],
+      channel: channelName,
+      preset: presetName,
+      info: infoParts,
+      message: taskId
+        ? 'Task started. Result will be sent to user automatically. Do not resubmit same request.'
+        : `Task started but taskId not resolved yet. Result will still be sent automatically. Optionally query with ${getQueryToolName()}.`
+    })
   }
 
   /**
@@ -484,6 +622,90 @@ class MediaLunaGenerateTool extends StructuredTool {
       if (session) {
         await session.send(`生成出错: ${e instanceof Error ? e.message : '未知错误'}`)
       }
+    }
+  }
+}
+
+/**
+ * 任务查询工具（内部自动注册）
+ */
+class MediaLunaTaskQueryTool extends StructuredTool {
+  name = getQueryToolName()
+  description = 'Query Media Luna task status and output URLs by task IDs. Use this after task-mode submit tools.'
+  schema: any = z.object({
+    taskIds: z.array(z.number()).min(1).max(20).describe('Task IDs returned by submit tools'),
+    waitMs: z.number().min(0).max(300000).optional().describe('Optional wait timeout in milliseconds. Default: 300000 (5 minutes, wait until all tasks finish or timeout). Set 0 for single snapshot.')
+  })
+
+  constructor(private ctx: Context, private logger: any) {
+    super()
+  }
+
+  async _call(
+    input: { taskIds: number[]; waitMs?: number },
+    _runManager?: CallbackManagerForToolRun
+  ): Promise<string> {
+    try {
+      const mediaLuna = (this.ctx as any).mediaLuna
+      const taskService = mediaLuna?.tasks
+      if (!taskService) {
+        return JSON.stringify({ ok: false, error: 'Task service not available' })
+      }
+
+      const taskIds = input.taskIds
+      const waitMs = Math.max(0, Math.min(300000, input.waitMs ?? 300000))
+      const deadline = Date.now() + waitMs
+
+      let snapshots: any[] = []
+      while (true) {
+        snapshots = await Promise.all(taskIds.map((taskId) => taskService.getById(taskId)))
+
+        const allDone = snapshots.every((task) => !task || task.status === 'success' || task.status === 'failed')
+        if (allDone || Date.now() >= deadline) break
+        await new Promise(resolve => setTimeout(resolve, 400))
+      }
+
+      const results = taskIds.map((taskId, i) => {
+        const task = snapshots[i]
+        if (!task) {
+          return {
+            index: i + 1,
+            taskId,
+            status: 'not_found'
+          }
+        }
+
+        const outputs = Array.isArray(task.responseSnapshot) ? task.responseSnapshot : []
+        const urls = outputs
+          .filter((asset: any) => !!asset?.url)
+          .map((asset: any) => asset.url)
+
+        const errorMsg = task.status === 'failed'
+          ? (task.middlewareLogs?._error?.message || '任务失败')
+          : undefined
+
+        return {
+          index: i + 1,
+          taskId,
+          status: task.status,
+          urls,
+          error: errorMsg,
+          duration: task.duration ?? undefined
+        }
+      })
+
+      const done = results.filter((item) => item.status === 'success' || item.status === 'failed').length
+      const timedOut = done < results.length && Date.now() >= deadline
+      return JSON.stringify({
+        ok: true,
+        timedOut,
+        done,
+        total: results.length,
+        results
+      })
+    } catch (e) {
+      this.logger.error(`[MediaLunaTaskQueryTool] Error:`, e)
+      return JSON.stringify({ ok: false, error: e instanceof Error ? e.message : 'Unknown error' })
     }
   }
 }

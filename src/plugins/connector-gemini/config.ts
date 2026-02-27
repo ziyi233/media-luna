@@ -78,6 +78,20 @@ export const connectorFields: ConnectorField[] = [
     description: '启用后模型可使用 Google 搜索获取实时信息'
   },
   {
+    key: 'enableGoogleImageSearch',
+    label: '启用谷歌图片搜索接地',
+    type: 'boolean',
+    default: false,
+    description: '启用后在 Google Search 工具中增加 imageSearch，可使用图片搜索结果作为视觉上下文（建议配合 Flash Image 模型）'
+  },
+  {
+    key: 'exposeGroundingSources',
+    label: '输出接地来源信息',
+    type: 'boolean',
+    default: false,
+    description: '启用后将 groundingMetadata 中的来源网页链接与搜索查询以文本形式追加到输出（默认关闭）'
+  },
+  {
     key: 'thinkingLevel',
     label: '思考程度',
     type: 'select',

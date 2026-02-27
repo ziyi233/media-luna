@@ -30,6 +30,8 @@ async function generate(
     outputMimeType,
     forceImageOutput,
     enableGoogleSearch,
+    enableGoogleImageSearch,
+    exposeGroundingSources,
     thinkingLevel,
     includeThoughts,
     filterThoughtImages,
@@ -132,9 +134,15 @@ async function generate(
     requestBody.generationConfig.thinkingConfig = thinkingConfig
   }
 
-  // 启用谷歌搜索
+  // 启用谷歌搜索（按官方示例使用 google_search，支持 webSearch / imageSearch）
   if (enableGoogleSearch) {
-    requestBody.tools = [{ googleSearch: {} }]
+    const searchTypes: Record<string, any> = {
+      webSearch: {}
+    }
+    if (enableGoogleImageSearch) {
+      searchTypes.imageSearch = {}
+    }
+    requestBody.tools = [{ google_search: { searchTypes } }]
   }
 
   // 添加安全过滤设置
@@ -211,6 +219,74 @@ async function generate(
           })
         }
       }
+
+      // 可选输出 grounding 来源信息
+      if (exposeGroundingSources) {
+        const groundingMetadata = candidate.groundingMetadata || response.groundingMetadata
+        if (groundingMetadata) {
+          const groundingLines: string[] = []
+
+          const imageSearchQueries: string[] = groundingMetadata.imageSearchQueries || []
+          const webSearchQueries: string[] = groundingMetadata.webSearchQueries || []
+
+          if (imageSearchQueries.length > 0) {
+            groundingLines.push(`图片搜索查询: ${imageSearchQueries.join(' | ')}`)
+          }
+          if (webSearchQueries.length > 0) {
+            groundingLines.push(`网页搜索查询: ${webSearchQueries.join(' | ')}`)
+          }
+
+          const chunks = Array.isArray(groundingMetadata.groundingChunks)
+            ? groundingMetadata.groundingChunks
+            : []
+
+          const sourceUris: string[] = []
+          const sourceImageUris: string[] = []
+          for (const chunk of chunks) {
+            const uri = chunk?.uri || chunk?.web?.uri
+            const imageUri = chunk?.image_uri || chunk?.imageUri
+            if (uri && typeof uri === 'string') {
+              sourceUris.push(uri)
+            }
+            if (imageUri && typeof imageUri === 'string') {
+              sourceImageUris.push(imageUri)
+            }
+          }
+
+          const uniqueSourceUris = Array.from(new Set(sourceUris))
+          if (uniqueSourceUris.length > 0) {
+            groundingLines.push('来源网页:')
+            uniqueSourceUris.slice(0, 10).forEach((uri, idx) => {
+              groundingLines.push(`${idx + 1}. ${uri}`)
+            })
+            if (uniqueSourceUris.length > 10) {
+              groundingLines.push(`... 其余 ${uniqueSourceUris.length - 10} 条已省略`)
+            }
+          }
+
+          const uniqueImageUris = Array.from(new Set(sourceImageUris))
+          if (uniqueImageUris.length > 0) {
+            groundingLines.push('来源图片直链:')
+            uniqueImageUris.slice(0, 5).forEach((uri, idx) => {
+              groundingLines.push(`${idx + 1}. ${uri}`)
+            })
+            if (uniqueImageUris.length > 5) {
+              groundingLines.push(`... 其余 ${uniqueImageUris.length - 5} 条已省略`)
+            }
+          }
+
+          if (groundingLines.length > 0) {
+            assets.push({
+              kind: 'text',
+              content: `【Google 搜索接地】\n${groundingLines.join('\n')}`,
+              meta: {
+                model,
+                grounding: true
+              }
+            })
+          }
+        }
+      }
     }
 
     logger.debug('[gemini] Response stats: totalParts=%d, thoughtParts=%d, imageParts=%d, assets=%d',
@@ -264,7 +340,9 @@ export const GeminiConnector: ConnectorDefinition = {
       numberOfImages,
       aspectRatio,
       imageSize,
-      enableGoogleSearch
+      enableGoogleSearch,
+      enableGoogleImageSearch,
+      exposeGroundingSources
     } = config
 
     const parameters: Record<string, any> = {}
@@ -274,6 +352,8 @@ export const GeminiConnector: ConnectorDefinition = {
     if (aspectRatio) parameters.aspectRatio = aspectRatio
     if (imageSize) parameters.imageSize = imageSize
     if (enableGoogleSearch) parameters.googleSearch = true
+    if (enableGoogleImageSearch) parameters.googleImageSearch = true
+    if (exposeGroundingSources) parameters.exposeGroundingSources = true
 
     return {
       endpoint: apiUrl?.split('?')[0] || 'generativelanguage.googleapis.com',

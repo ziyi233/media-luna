@@ -31,6 +31,131 @@ const CAPABILITY_GROUPS: Array<{ key: CapabilityKey; label: string }> = [
 ]
 
 const CAPABILITY_KEYS = new Set<CapabilityKey>(CAPABILITY_GROUPS.map(group => group.key))
+const TASK_REF_REGEX = /#task(\d+)(?:\((\d+)\))?/gi
+
+interface TaskRefMatch {
+  raw: string
+  taskId: number
+  index?: number
+}
+
+interface TaskRefResolveResult {
+  prompt: string
+  injectedCount: number
+  injectedTasks: Array<{ taskId: number; count: number; index?: number }>
+}
+
+function parseTaskRefs(text: string): TaskRefMatch[] {
+  const refs: TaskRefMatch[] = []
+  let match: RegExpExecArray | null
+  while ((match = TASK_REF_REGEX.exec(text)) !== null) {
+    refs.push({
+      raw: match[0],
+      taskId: Number(match[1]),
+      index: match[2] ? Number(match[2]) : undefined
+    })
+  }
+  return refs
+}
+
+function stripTaskRefs(text: string): string {
+  return text.replace(TASK_REF_REGEX, ' ').replace(/\s+/g, ' ').trim()
+}
+
+function guessImageMimeFromUrl(url: string): string {
+  const lower = url.toLowerCase()
+  if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) return 'image/jpeg'
+  if (lower.endsWith('.webp')) return 'image/webp'
+  if (lower.endsWith('.gif')) return 'image/gif'
+  if (lower.endsWith('.bmp')) return 'image/bmp'
+  return 'image/png'
+}
+
+async function resolveTaskRefsInPrompt(
+  ctx: any,
+  mediaLuna: any,
+  session: Session | undefined,
+  prompt: string,
+  files: FileData[],
+  logger: any
+): Promise<TaskRefResolveResult> {
+  const refs = parseTaskRefs(prompt)
+  if (refs.length === 0) {
+    return { prompt, injectedCount: 0, injectedTasks: [] }
+  }
+
+  const taskService = mediaLuna?.tasks
+  if (!taskService) {
+    throw new Error('任务服务不可用，无法解析 #task 引用')
+  }
+
+  const uid = (session as any)?.user?.id
+  const isAdmin = (session as any)?.user?.authority >= 3
+  const injectedTasks: Array<{ taskId: number; count: number; index?: number }> = []
+  let injectedCount = 0
+
+  for (const ref of refs) {
+    const task = await taskService.getById(ref.taskId)
+    if (!task) {
+      throw new Error(`未找到任务「${ref.taskId}」`)
+    }
+    if (task.status !== 'success') {
+      throw new Error(`任务「${ref.taskId}」状态为 ${task.status}，仅支持引用成功任务`)
+    }
+    if (!isAdmin && uid && task.uid !== uid) {
+      throw new Error(`无权引用任务「${ref.taskId}」`)
+    }
+
+    const imageAssets = (task.responseSnapshot || []).filter((a: OutputAsset) => a.kind === 'image' && !!a.url)
+    if (imageAssets.length === 0) {
+      throw new Error(`任务「${ref.taskId}」没有可用图片输出`)
+    }
+
+    const selected = ref.index !== undefined
+      ? (() => {
+          if (ref.index! <= 0 || ref.index! > imageAssets.length) {
+            throw new Error(`任务「${ref.taskId}」不存在第 ${ref.index} 张图片`)
+          }
+          return [imageAssets[ref.index! - 1]]
+        })()
+      : imageAssets
+
+    let currentInjected = 0
+    for (let i = 0; i < selected.length; i++) {
+      const asset = selected[i]
+      try {
+        const response = await ctx.http.get(asset.url, {
+          responseType: 'arraybuffer',
+          timeout: 30000
+        })
+        if (!response || response.byteLength === 0) {
+          throw new Error('empty response')
+        }
+        const buffer = Buffer.from(response)
+        const arrayBuffer = buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength)
+        const mime = asset.mime || guessImageMimeFromUrl(asset.url || '')
+        files.push({
+          data: arrayBuffer,
+          mime,
+          filename: `task_${ref.taskId}_${ref.index ?? i + 1}.${mime.split('/')[1] || 'png'}`
+        })
+        injectedCount++
+        currentInjected++
+      } catch (e) {
+        logger.warn('Failed to fetch task reference image task=%s index=%s: %s', ref.taskId, ref.index ?? (i + 1), e)
+        throw new Error(`下载任务「${ref.taskId}」引用图片失败（URL可能已过期）`)
+      }
+    }
+
+    injectedTasks.push({ taskId: ref.taskId, count: currentInjected, index: ref.index })
+  }
+
+  return {
+    prompt: stripTaskRefs(prompt),
+    injectedCount,
+    injectedTasks
+  }
+}
 
 /**
  * 从渠道标签解析“直接触发所需图片数”覆盖值。
@@ -785,7 +910,7 @@ export default definePlugin({
           const request = task.requestSnapshot
           const originalPrompt = request?.prompt || ''
           const appendPrompt = appendPromptParts.join(' ').trim()
-          const prompt = appendPrompt
+          let prompt = appendPrompt
             ? (originalPrompt ? `${originalPrompt} ${appendPrompt}` : appendPrompt)
             : originalPrompt
           const presetName = request?.parameters?.preset
@@ -850,6 +975,19 @@ export default definePlugin({
             infoParts.push(`参考图: ${files.length} 张`)
           } else if (inputFileWarning) {
             infoParts.push(`⚠️ ${inputFileWarning}`)
+          }
+
+          // redraw 支持 #task12345 / #task12345(3)
+          if (prompt && TASK_REF_REGEX.test(prompt)) {
+            TASK_REF_REGEX.lastIndex = 0
+            const resolved = await resolveTaskRefsInPrompt(ctx, mediaLunaRef, session, prompt, files, logger)
+            prompt = resolved.prompt
+            if (resolved.injectedCount > 0) {
+              const taskHint = resolved.injectedTasks
+                .map(item => item.index ? `#${item.taskId}(${item.index}) x${item.count}` : `#${item.taskId} x${item.count}`)
+                .join(', ')
+              infoParts.push(`任务引用: ${resolved.injectedCount} 张（${taskHint}）`)
+            }
           }
 
           return executeGenerate(ctx, session, mediaLunaRef, {
@@ -975,6 +1113,22 @@ function registerChannelCommand(
       const promptText = extractor.extractTextWithoutCommand(session?.elements || [])
       if (promptText) {
         state.prompts.push(promptText)
+      }
+
+      // 支持 #task12345 / #task12345(3) 变量，将历史任务输出图注入为参考图
+      if (state.prompts.length > 0) {
+        const mergedPrompt = state.prompts.join(' ').trim()
+        if (TASK_REF_REGEX.test(mergedPrompt)) {
+          TASK_REF_REGEX.lastIndex = 0
+          const resolved = await resolveTaskRefsInPrompt(ctx, mediaLuna, session, mergedPrompt, state.files, logger)
+          state.prompts = resolved.prompt ? [resolved.prompt] : []
+          if (resolved.injectedCount > 0) {
+            const taskHint = resolved.injectedTasks
+              .map(item => item.index ? `#${item.taskId}(${item.index}) x${item.count}` : `#${item.taskId} x${item.count}`)
+              .join(', ')
+            await session?.send(`已注入任务参考图 ${resolved.injectedCount} 张（${taskHint}）`)
+          }
+        }
       }
 
       // 如果命令行指定了图片 URL，也获取

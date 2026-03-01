@@ -663,11 +663,14 @@ export default definePlugin({
           }
 
           // 获取渠道信息用于显示名称
-          const channelMap = new Map<number, string>()
+          const channelMap = new Map<number, { name: string; tags: string[] }>()
           if (channelService) {
             const channels = await channelService.list()
             for (const ch of channels) {
-              channelMap.set(ch.id, ch.name)
+              channelMap.set(ch.id, {
+                name: ch.name,
+                tags: ch.tags || []
+              })
             }
           }
 
@@ -679,7 +682,9 @@ export default definePlugin({
 
           for (const task of tasks) {
             const lines: string[] = []
-            const channelName = channelMap.get(task.channelId) || `渠道#${task.channelId}`
+            const channelInfo = channelMap.get(task.channelId)
+            const channelName = channelInfo?.name || `渠道#${task.channelId}`
+            const linkModeTag = resolveLinkMode(config, channelInfo?.tags || [], session?.bot?.platform)
             const statusText = task.status === 'success' ? '✅' : task.status === 'failed' ? '❌' : '⏳'
 
             lines.push(`${statusText}「${task.id}」${channelName}`)
@@ -700,7 +705,13 @@ export default definePlugin({
             if (task.status === 'success' && task.responseSnapshot && task.responseSnapshot.length > 0) {
               const firstImage = task.responseSnapshot.find((a: OutputAsset) => a.kind === 'image' && a.url)
               if (firstImage && firstImage.url) {
-                forwardMessages.push(`<message>${lines.join('\n')}\n<image url="${firstImage.url}"/></message>`)
+                if (linkModeTag) {
+                  lines.push(`📎 因渠道标签 [${linkModeTag}] 启用链接模式`)
+                  lines.push(`首图链接: ${firstImage.url}`)
+                  forwardMessages.push(`<message>${lines.join('\n')}</message>`)
+                } else {
+                  forwardMessages.push(`<message>${lines.join('\n')}\n<image url="${firstImage.url}"/></message>`)
+                }
               } else {
                 forwardMessages.push(`<message>${lines.join('\n')}</message>`)
               }
@@ -750,12 +761,16 @@ export default definePlugin({
 
           // 获取渠道名称
           let channelName = `渠道#${task.channelId}`
+          let channelTags: string[] = []
           if (channelService) {
             const channel = await channelService.getById(task.channelId)
             if (channel) {
               channelName = channel.name
+              channelTags = channel.tags || []
             }
           }
+
+          const linkModeTag = resolveLinkMode(config, channelTags, session?.bot?.platform)
 
           const forwardMessages: string[] = []
 
@@ -817,7 +832,11 @@ export default definePlugin({
               forwardMessages.push(`<message>📥 输入图片 (${inputFiles.length} 个)</message>`)
               for (const file of inputFiles) {
                 if (file.kind === 'image' && file.url) {
-                  forwardMessages.push(`<message><image url="${file.url}"/></message>`)
+                  if (linkModeTag) {
+                    forwardMessages.push(`<message>输入图链接: ${file.url}</message>`)
+                  } else {
+                    forwardMessages.push(`<message><image url="${file.url}"/></message>`)
+                  }
                 }
               }
             }
@@ -826,12 +845,23 @@ export default definePlugin({
           // 输出结果
           if (task.status === 'success' && task.responseSnapshot && task.responseSnapshot.length > 0) {
             forwardMessages.push(`<message>🎨 输出结果 (${task.responseSnapshot.length} 个)</message>`)
+            if (linkModeTag) {
+              forwardMessages.push(`<message>📎 因渠道标签 [${linkModeTag}] 启用链接模式</message>`)
+            }
 
             for (const asset of task.responseSnapshot) {
               if (asset.kind === 'image' && asset.url) {
-                forwardMessages.push(`<message><image url="${asset.url}"/></message>`)
+                if (linkModeTag) {
+                  forwardMessages.push(`<message>${asset.url}</message>`)
+                } else {
+                  forwardMessages.push(`<message><image url="${asset.url}"/></message>`)
+                }
               } else if (asset.kind === 'video' && asset.url) {
-                forwardMessages.push(`<message><video url="${asset.url}"/></message>`)
+                if (linkModeTag) {
+                  forwardMessages.push(`<message>${asset.url}</message>`)
+                } else {
+                  forwardMessages.push(`<message><video url="${asset.url}"/></message>`)
+                }
               } else if (asset.kind === 'audio' && asset.url) {
                 forwardMessages.push(`<message><audio url="${asset.url}"/></message>`)
               } else if (asset.kind === 'text' && asset.content) {

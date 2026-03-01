@@ -70,7 +70,7 @@ export const connectorFields: ConnectorField[] = [
     label: '强制图片输出',
     type: 'boolean',
     default: false,
-    description: '启用后添加 responseModalities: ["TEXT", "IMAGE"] 参数，强制模型输出图片'
+    description: '启用后添加 responseModalities: ["IMAGE"]，强制仅输出图片（不返回文本）'
   },
   {
     key: 'enableGoogleSearch',

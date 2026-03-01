@@ -117,9 +117,9 @@ async function generate(
     generationConfig: {}
   }
 
-  // 仅在启用时添加 responseModalities（根据文档使用 TEXT + IMAGE）
+  // 启用后强制仅返回图片
   if (forceImageOutput) {
-    requestBody.generationConfig.responseModalities = ['TEXT', 'IMAGE']
+    requestBody.generationConfig.responseModalities = ['IMAGE']
   }
 
   // 仅在配置了值时才添加 imageConfig

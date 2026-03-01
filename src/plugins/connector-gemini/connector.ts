@@ -4,6 +4,22 @@ import { Context } from 'koishi'
 import type { ConnectorDefinition, FileData, OutputAsset, ConnectorRequestLog } from '../../core'
 import { connectorFields, connectorCardFields } from './config'
 
+function normalizeImageSize(imageSize: unknown): string | undefined {
+  if (imageSize === undefined || imageSize === null) return undefined
+  const raw = String(imageSize).trim()
+  if (!raw) return undefined
+
+  const kMatch = raw.match(/^(\d+(?:\.\d+)?)\s*[kK]$/)
+  if (kMatch) {
+    const normalized = Number(kMatch[1])
+    if (!Number.isNaN(normalized)) {
+      return `${normalized}K`
+    }
+  }
+
+  return raw
+}
+
 /** Gemini 生成函数 */
 async function generate(
   ctx: Context,
@@ -40,6 +56,7 @@ async function generate(
     personGeneration,
     timeout
   } = config
+  const normalizedImageSize = normalizeImageSize(imageSize)
 
   // 调试：打印解构后的值
   logger.debug('[gemini] filterThoughtImages after destructure: %o', filterThoughtImages)
@@ -108,7 +125,7 @@ async function generate(
   // 仅在配置了值时才添加 imageConfig
   const imageConfig: Record<string, any> = {}
   if (aspectRatio) imageConfig.aspectRatio = aspectRatio
-  if (imageSize) imageConfig.imageSize = imageSize
+  if (normalizedImageSize) imageConfig.imageSize = normalizedImageSize
   if (outputMimeType) {
     imageConfig.imageOutputOptions = { mimeType: outputMimeType }
   }
@@ -350,7 +367,8 @@ export const GeminiConnector: ConnectorDefinition = {
       parameters.numberOfImages = Number(numberOfImages)
     }
     if (aspectRatio) parameters.aspectRatio = aspectRatio
-    if (imageSize) parameters.imageSize = imageSize
+    const normalizedImageSize = normalizeImageSize(imageSize)
+    if (normalizedImageSize) parameters.imageSize = normalizedImageSize
     if (enableGoogleSearch) parameters.googleSearch = true
     if (enableGoogleImageSearch) parameters.googleImageSearch = true
     if (exposeGroundingSources) parameters.exposeGroundingSources = true

@@ -44,13 +44,15 @@ export const connectorFields: ConnectorField[] = [
   {
     key: 'imageSize',
     label: '图片尺寸',
-    type: 'select',
+    type: 'combobox',
+    placeholder: '选择预设尺寸或输入自定义值（如 0.5K）',
     options: [
+      { label: '512x512 (0.5K)', value: '0.5K' },
       { label: '1024x1024 (1K)', value: '1K' },
       { label: '2048x2048 (2K)', value: '2K' },
       { label: '4096x4096 (4K)', value: '4K' }
     ],
-    description: '生成图像的分辨率'
+    description: '生成图像的分辨率（可从预设选择或输入自定义值）'
   },
   {
     key: 'outputMimeType',

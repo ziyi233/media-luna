@@ -1,6 +1,6 @@
 // Koishi 聊天指令插件入口
 // 注册渠道名指令，支持收集模式
-import {} from 'koishi-plugin-adapter-onebot'
+import { } from 'koishi-plugin-adapter-onebot'
 import { definePlugin } from '../../core'
 import type { PluginContext } from '../../core/types'
 import {
@@ -1120,11 +1120,34 @@ function registerChannelCommand(
   if (!existingOptions['video']) {
     channelCmd.option('video', '-v <url:string> 输入视频URL')
   }
+  if (channel.connectorId === 'comfyui') {
+    if (!existingOptions['resolution']) {
+      channelCmd.option('resolution', '-r <resolution:string> 修改生成分辨率(如 1024x1280)')
+    }
+    if (!existingOptions['steps']) {
+      channelCmd.option('steps', '-s <steps:number> 修改生成步数')
+    }
+    if (!existingOptions['cfg']) {
+      channelCmd.option('cfg', '-c <cfg:number> 修改CFG比例')
+    }
+    if (!existingOptions['denoise']) {
+      channelCmd.option('denoise', '-d <denoise:number> 修改重绘幅度(图生图)')
+    }
+    if (!existingOptions['framerate']) {
+      channelCmd.option('framerate', '--fps <framerate:number> 修改视频帧率')
+    }
+    if (!existingOptions['time']) {
+      channelCmd.option('time', '-t <time:number> 修改视频时长(秒)')
+    }
+    if (!existingOptions['motion']) {
+      channelCmd.option('motion', '-m <motion:number> 修改运动幅度')
+    }
+  }
 
   // 设置用法说明和动作处理器
   channelCmd
     .usage(`用法: ${commandName} [预设名] <提示词>\n可用预设: ${presets.map((p: any) => p.name).join(', ') || '无'}`)
-    .action(async ({ session, options }: { session: Session; options: any }) => {
+    .action(async ({ session, options }: { session: Session; options: any }, ...rest: string[]) => {
       // 初始化收集状态（预设名稍后解析）
       const state: CollectState = {
         files: [],
@@ -1139,8 +1162,10 @@ function registerChannelCommand(
       // 从当前消息提取媒体内容（图片、at、引用）
       await extractor.extractMedia(session)
 
-      // 提取文本，自动去除命令名前缀
-      const promptText = extractor.extractTextWithoutCommand(session?.elements || [])
+      // 使用 Koishi 解析后的 rest 拼装剥离了指令和 options 的内容
+      const rawPrompt = rest.join(' ')
+      const parsedElements = h.parse(rawPrompt)
+      const promptText = extractor.extractText(parsedElements)
       if (promptText) {
         state.prompts.push(promptText)
       }
@@ -1176,7 +1201,7 @@ function registerChannelCommand(
         if (state.prompts.length === 0 && state.files.length === 0) {
           return '请输入提示词'
         }
-        return executeGenerateWithPresetCheck(ctx, session, channel, state, mediaLuna, config)
+        return executeGenerateWithPresetCheck(ctx, session, channel, state, mediaLuna, config, options)
       }
 
       // 以下是需要媒体输入的渠道（img2xxx/video2xxx 类型）
@@ -1192,11 +1217,11 @@ function registerChannelCommand(
           ].join('\n')
         }
         // 图片数量足够，直接生成
-        return executeGenerateWithPresetCheck(ctx, session, channel, state, mediaLuna, config)
+        return executeGenerateWithPresetCheck(ctx, session, channel, state, mediaLuna, config, options)
       }
 
       // 进入收集模式
-      return enterCollectMode(ctx, session, channel, state, config, mediaLuna, logger)
+      return enterCollectMode(ctx, session, channel, state, config, mediaLuna, logger, options)
     })
 
   logger.debug(`Registered command: ${channel.name} (needsMediaInput: ${needsMediaInput}, ${presets.length} presets)`)
@@ -1371,14 +1396,14 @@ class MessageExtractor {
           if (isLocalPath && fileId && session.onebot?._request) {
             try {
               this.logger.info(`Attempting to fetch real URL for video fileId: ${fileId} using NapCat API`)
-              const {data}  = await session.onebot._request("get_file", { file: fileId })
+              const { data } = await session.onebot._request("get_file", { file: fileId })
               // NapCat get_file 返回 { file_name, md5, size, url, ... }
               if (data && data.url && (data.url.startsWith("http://") || data.url.startsWith("https://"))) {
                 this.logger.info(`Successfully retrieved NapCat video URL: ${data.url}`)
                 targetUrl = data.url
               } else {
                 this.logger.warn(`NapCat API returned no URL for fileId: ${fileId}. Trying to use get_group_file_url.`)
-                const {data}  = await session.onebot._request("get_group_file_url", { file: fileId, group_id: session.guildId})
+                const { data } = await session.onebot._request("get_group_file_url", { file: fileId, group_id: session.guildId })
                 if (data && data.url && (data.url.startsWith("http://") || data.url.startsWith("https://"))) {
                   this.logger.info(`Successfully retrieved NapCat video URL: ${data.url}`)
                   targetUrl = data.url
@@ -1611,7 +1636,7 @@ class MessageExtractor {
     }
     // WebP: 52 49 46 46 ... 57 45 42 50
     if (buffer[0] === 0x52 && buffer[1] === 0x49 && buffer[2] === 0x46 && buffer[3] === 0x46 &&
-        buffer.length > 11 && buffer[8] === 0x57 && buffer[9] === 0x45 && buffer[10] === 0x42 && buffer[11] === 0x50) {
+      buffer.length > 11 && buffer[8] === 0x57 && buffer[9] === 0x45 && buffer[10] === 0x42 && buffer[11] === 0x50) {
       return 'image/webp'
     }
     // BMP: 42 4D
@@ -1657,7 +1682,8 @@ async function executeGenerateWithPresetCheck(
   channel: any,
   state: CollectState,
   mediaLuna: any,
-  config: KoishiCommandsConfig
+  config: KoishiCommandsConfig,
+  options?: any
 ): Promise<string> {
   // 实时获取该渠道匹配的预设列表（基于渠道标签与预设标签匹配）
   const combinations = await mediaLuna.getChannelPresetCombinations()
@@ -1696,12 +1722,17 @@ async function executeGenerateWithPresetCheck(
 
   const summaryMsg = `开始生成 | ${summaryParts.join(' | ')}`
 
+  const cleanOptions = { ...options }
+  delete cleanOptions.image
+  delete cleanOptions.video
+
   // 执行生成（传递 config 和渠道标签用于链接模式检查）
   return executeGenerate(ctx, session, mediaLuna, {
     channelName: channel.name,
     presetName,
     prompt: actualPrompt,
     files: state.files,
+    parameters: cleanOptions,
     summaryMsg
   }, config, channel.tags || [])
 }
@@ -1718,7 +1749,8 @@ async function enterCollectMode(
   state: CollectState,
   config: KoishiCommandsConfig,
   mediaLuna: any,
-  logger: any
+  logger: any,
+  options?: any
 ): Promise<string> {
   if (!session) {
     return '会话不可用'
@@ -1727,7 +1759,7 @@ async function enterCollectMode(
   // 发送收集模式提示
   const imgCount = state.files.filter(f => f.mime.startsWith('image/')).length
   const videoCount = state.files.filter(f => f.mime.startsWith('video/')).length
-  
+
   const hintMsgIds = await session.send(
     `已进入收集模式，请继续发送图片/视频/@用户/文字\n发送「开始」触发生成，发送「取消」退出\n当前已收集: ${imgCount} 张图片, ${videoCount} 个视频`
   )
@@ -1795,7 +1827,7 @@ async function enterCollectMode(
 
         // 开始生成（带预设检查）
         const result = await executeGenerateWithPresetCheck(
-          ctx, session, channel, state, mediaLuna, config
+          ctx, session, channel, state, mediaLuna, config, options
         )
         resolve(result)
         return
@@ -1839,7 +1871,7 @@ async function enterCollectMode(
       // 只在有图片收集失败时反馈
       const result = extractor.getResult()
       if (result.failed > 0) {
-        sess.send(`⚠️ ${result.failed}张图片收集失败，当前共${state.files.length}张`).catch(() => {})
+        sess.send(`⚠️ ${result.failed}张图片收集失败，当前共${state.files.length}张`).catch(() => { })
       }
 
       // 不传递给下一个中间件，阻止其他指令处理
@@ -1874,6 +1906,7 @@ async function executeGenerate(
     presetName?: string
     prompt: string
     files: FileData[]
+    parameters?: Record<string, any>
     summaryMsg?: string
   },
   config: KoishiCommandsConfig,
@@ -1893,6 +1926,7 @@ async function executeGenerate(
       presetName: options.presetName,
       prompt: options.prompt,
       files: options.files,
+      parameters: options.parameters,
       session,
       uid,
       // prepare 阶段完成后的回调：将 before hints 和状态消息合并发送

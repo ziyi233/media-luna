@@ -86,8 +86,8 @@
             <!-- 已上传的图片列表 -->
             <div class="upload-list" v-if="fileList.length > 0">
               <div v-for="(file, index) in fileList" :key="file.uid" class="upload-item">
-                <img v-if="file.raw?.type.startsWith('image/')" :src="file.url" class="upload-thumb" />
-                <video v-else-if="file.raw?.type.startsWith('video/')" :src="file.url" class="upload-thumb" />
+                <img v-if="isImageFile(file)" :src="file.url" class="upload-thumb" />
+                <video v-else-if="isVideoFile(file)" :src="file.url" class="upload-thumb" />
                 <div v-else class="upload-thumb unknown-file">❓</div>
                 <div class="upload-overlay" @click="removeFile(index)">
                   <span>🗑️</span>
@@ -391,7 +391,27 @@ import AudioPlayer from './AudioPlayer.vue'
 interface LocalFile {
   uid: number
   url: string
+  mimeType?: string
   raw: File | null  // null 表示从 URL 加载的图片
+}
+
+const IMAGE_EXT_REGEX = /\.(png|jpe?g|gif|webp|bmp|svg|avif)(?:$|[?#])/i
+const VIDEO_EXT_REGEX = /\.(mp4|webm|mov|m4v|avi|mkv)(?:$|[?#])/i
+
+function inferMimeTypeByUrl(url: string): string | undefined {
+  if (IMAGE_EXT_REGEX.test(url)) return 'image/*'
+  if (VIDEO_EXT_REGEX.test(url)) return 'video/*'
+  return undefined
+}
+
+function isImageFile(file: LocalFile): boolean {
+  const mimeType = file.raw?.type || file.mimeType || inferMimeTypeByUrl(file.url)
+  return !!mimeType && mimeType.startsWith('image/')
+}
+
+function isVideoFile(file: LocalFile): boolean {
+  const mimeType = file.raw?.type || file.mimeType || inferMimeTypeByUrl(file.url)
+  return !!mimeType && mimeType.startsWith('video/')
 }
 
 // 选择模式状态
@@ -677,6 +697,7 @@ const addFiles = async (files: File[]) => {
     fileList.value.push({
       uid: ++fileUid,
       url,
+      mimeType: file.type,
       raw: file
     })
 
@@ -863,6 +884,7 @@ const handleHistorySelect = async (task: { id: number; prompt: string }) => {
           fileList.value.push({
             uid: ++fileUid,
             url: log.url,
+            mimeType: inferMimeTypeByUrl(log.url),
             raw: null // URL 模式，无原始文件
           })
 

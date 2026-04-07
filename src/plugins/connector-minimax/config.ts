@@ -120,12 +120,12 @@ export const connectorFields: ConnectorField[] = [
     required: false,
     default: 'speech-2.6-hd',
     options: [
+      { value: 'speech-2.8-hd', label: 'speech-2.8-hd (最新)' },
+      { value: 'speech-2.8-turbo', label: 'speech-2.8-turbo (最新快速)' },
       { value: 'speech-2.6-hd', label: 'speech-2.6-hd (推荐)' },
       { value: 'speech-2.6-turbo', label: 'speech-2.6-turbo (快速)' },
       { value: 'speech-02-hd', label: 'speech-02-hd' },
-      { value: 'speech-02-turbo', label: 'speech-02-turbo' },
-      { value: 'speech-01-hd', label: 'speech-01-hd' },
-      { value: 'speech-01-turbo', label: 'speech-01-turbo' }
+      { value: 'speech-02-turbo', label: 'speech-02-turbo' }
     ],
     description: '语音合成模型'
   },

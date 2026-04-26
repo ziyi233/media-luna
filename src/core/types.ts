@@ -219,7 +219,7 @@ export interface MiddlewareDefinition {
 // ============ 连接器 ============
 
 /** 连接器支持的类型 */
-export type ConnectorSupportedType = 'image' | 'video' | 'audio'
+export type ConnectorSupportedType = 'image' | 'video' | 'audio' | 'text'
 
 /** 连接器配置字段 (与 ConfigField 相同，别名用于清晰) */
 export type ConnectorField = ConfigField

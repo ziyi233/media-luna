@@ -255,10 +255,23 @@ function applyParametersToWorkflow(workflow: any, parameters: Record<string, any
     if (!node?.inputs) continue
 
     // 步数, CFG, 重绘幅度
-    if (['KSampler', 'KSamplerAdvanced'].includes(node.class_type)) {
+    if (node.class_type === 'KSampler') {
       if (parameters.steps !== undefined) setPrimitiveInput(node, 'steps', parameters.steps)
       if (parameters.cfg !== undefined) setPrimitiveInput(node, 'cfg', parameters.cfg)
       if (parameters.denoise !== undefined) setPrimitiveInput(node, 'denoise', parameters.denoise)
+    }
+    else if (node.class_type === 'KSamplerAdvanced') {
+      if (parameters.steps !== undefined) setPrimitiveInput(node, 'steps', parameters.steps)
+      if (parameters.cfg !== undefined) setPrimitiveInput(node, 'cfg', parameters.cfg)
+
+      // 高级采样器没有 denoise 参数，通过公式自动计算 start_at_step
+      if (parameters.denoise !== undefined) {
+        // 获取总步数，优先取传入的步数，否则取节点原有的步数
+        const totalSteps = parameters.steps !== undefined ? parameters.steps : node.inputs.steps;
+        // 公式：起步 = 总步数 * (1 - 重绘幅度)，并四舍五入取整
+        const startStep = Math.round(totalSteps * (1 - parameters.denoise));
+        setPrimitiveInput(node, 'start_at_step', startStep);
+      }
     }
 
     // 视频帧率
@@ -280,7 +293,7 @@ function applyParametersToWorkflow(workflow: any, parameters: Record<string, any
     }
 
     // 分辨率处理
-    if (node.class_type === 'EmptyLatentImage') {
+    if (node.class_type === 'EmptyLatentImage' || node.class_type === 'EmptySD3LatentImage') {
       if (width !== undefined && height !== undefined) {
         setPrimitiveInput(node, 'width', width)
         setPrimitiveInput(node, 'height', height)
@@ -737,11 +750,28 @@ async function generate(
         if (nodeOutput.gifs) {
           await processOutputFiles(nodeOutput.gifs, 'video')
         }
+
+        // 处理文本输出
+        const textOutputs = nodeOutput.text || nodeOutput.string
+        if (textOutputs && Array.isArray(textOutputs)) {
+          for (const textItem of textOutputs) {
+            if (typeof textItem === 'string' && textItem.trim() !== '') {
+              assets.push({
+                kind: 'text',
+                content: textItem,
+                meta: {
+                  promptId,
+                  nodeId
+                }
+              })
+            }
+          }
+        }
       }
     }
 
     if (assets.length === 0) {
-      throw new Error('ComfyUI 执行完成但未返回图片')
+      throw new Error('ComfyUI 执行完成但未返回任何结果')
     }
 
     return assets
@@ -759,10 +789,10 @@ export const ComfyUIConnector: ConnectorDefinition = {
   name: 'ComfyUI',
   description: '基于节点的图像生成工作流，支持自定义 Workflow',
   icon: 'comfyui',
-  supportedTypes: ['image', 'video'],
+  supportedTypes: ['image', 'video', 'text'],
   fields: connectorFields,
   cardFields: connectorCardFields,
-  defaultTags: ['text2img', 'img2img', 'text2video', 'img2video'],
+  defaultTags: ['text2img', 'img2img', 'text2video', 'img2video', 'img2text'],
   generate,
 
   getRequestLog(config, files, prompt): ConnectorRequestLog {

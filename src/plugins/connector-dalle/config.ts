@@ -10,7 +10,8 @@ export const connectorFields: ConnectorField[] = [
     type: 'text',
     required: true,
     default: 'https://api.openai.com/v1/images/generations',
-    placeholder: 'https://api.openai.com/v1/images/generations'
+    placeholder: 'https://api.openai.com',
+    description: 'auto 模式填 Base URL (如 https://api.openai.com)；其他模式填完整端点 URL'
   },
   {
     key: 'apiKey',
@@ -33,10 +34,11 @@ export const connectorFields: ConnectorField[] = [
     type: 'select',
     default: 'generations',
     options: [
-      { label: 'generations (文生图/JSON)', value: 'generations' },
-      { label: 'edits (图生图/FormData)', value: 'edits' }
+      { label: 'auto (自动区分/补全端点)', value: 'auto' },
+      { label: 'generations (文生图/完整端点)', value: 'generations' },
+      { label: 'edits (图生图/完整端点)', value: 'edits' }
     ],
-    description: 'generations 使用 JSON 格式，edits 使用 multipart/form-data 上传图片'
+    description: 'auto 模式根据是否传图自动选择文生图或图生图，并自动补全 /v1/images/generations 或 edits 后缀'
   },
   {
     key: 'size',

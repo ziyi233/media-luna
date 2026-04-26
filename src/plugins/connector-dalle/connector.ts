@@ -32,11 +32,25 @@ async function generate(
     ? files.filter(f => f.mime.startsWith('image/'))
     : []
 
+  let actualApiMode = apiMode
+  let actualApiUrl = apiUrl
+
+  if (apiMode === 'auto') {
+    const baseUrl = apiUrl.replace(/\/+$/, '')
+    if (imageFiles.length > 0) {
+      actualApiMode = 'edits'
+      actualApiUrl = `${baseUrl}/v1/images/edits`
+    } else {
+      actualApiMode = 'generations'
+      actualApiUrl = `${baseUrl}/v1/images/generations`
+    }
+  }
+
   // 根据模式选择请求方式
-  if (apiMode === 'edits' && imageFiles.length > 0) {
+  if (actualApiMode === 'edits' && imageFiles.length > 0) {
     // edits 模式：使用 multipart/form-data
     return generateWithEdits(ctx, {
-      apiUrl,
+      apiUrl: actualApiUrl,
       apiKey,
       model,
       size,
@@ -48,7 +62,7 @@ async function generate(
   } else {
     // generations 模式：使用 JSON
     return generateWithGenerations(ctx, {
-      apiUrl,
+      apiUrl: actualApiUrl,
       apiKey,
       model,
       size,
@@ -216,9 +230,23 @@ export const DalleConnector: ConnectorDefinition = {
       ? files.filter(f => f.mime?.startsWith('image/')).length
       : 0
 
+    let actualApiMode = apiMode
+    let actualApiUrl = apiUrl
+
+    if (apiMode === 'auto') {
+      const baseUrl = apiUrl?.replace(/\/+$/, '') || ''
+      if (imageCount > 0) {
+        actualApiMode = 'edits'
+        actualApiUrl = `${baseUrl}/v1/images/edits`
+      } else {
+        actualApiMode = 'generations'
+        actualApiUrl = `${baseUrl}/v1/images/generations`
+      }
+    }
+
     // 只记录实际配置的参数
     const parameters: Record<string, any> = {}
-    parameters.apiMode = apiMode
+    parameters.apiMode = actualApiMode
     if (size) parameters.size = size
     if (quality) parameters.quality = quality
     if (style) parameters.style = style
@@ -226,7 +254,7 @@ export const DalleConnector: ConnectorDefinition = {
     if (imageCount > 0) parameters.imageInput = true
 
     return {
-      endpoint: apiUrl?.split('?')[0],
+      endpoint: actualApiUrl?.split('?')[0],
       model,
       prompt,
       fileCount: imageCount,

@@ -129,12 +129,6 @@ export class GenerationPipeline {
 
         const results = await this._executeLevel(enabledMiddlewares, context)
 
-        // 如果是 lifecycle-prepare 阶段完成后，调用回调通知调用者
-        if (isPreparePhase && !preparePhaseCompleted) {
-          preparePhaseCompleted = true
-          await this._callPrepareCompleteCallback(request, context)
-        }
-
         // 检查是否有停止或错误
         for (const result of results) {
           if (result.status === 'stop') {
@@ -150,6 +144,12 @@ export class GenerationPipeline {
             pipelineError = result.error ?? new Error('Unknown middleware error')
             break
           }
+        }
+
+        // 如果是 lifecycle-prepare 阶段完成后，调用回调通知调用者
+        if (isPreparePhase && !preparePhaseCompleted && !earlyStopByMiddleware && !pipelineError) {
+          preparePhaseCompleted = true
+          await this._callPrepareCompleteCallback(request, context)
         }
 
         // 如果有停止或错误，跳出循环

@@ -330,8 +330,8 @@ export interface GenerationRequest {
   /** 用户 ID（可选，用于计费和记录） */
   uid?: number
   /**
-   * prepare 阶段完成后的回调
-   * 返回 before hints，调用者可以决定如何显示
+   * prepare 阶段成功通过后的回调
+   * 返回 before hints，调用者可以决定如何显示或据此进入后续异步流程
    */
   onPrepareComplete?: (hints: string[]) => Promise<void>
 }

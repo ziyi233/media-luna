@@ -19,6 +19,11 @@ interface MiddlewareResult {
   error?: Error
 }
 
+interface LevelOutcome {
+  stopped: boolean
+  error: Error | null
+}
+
 /**
  * GenerationPipeline - 生成管道
  *
@@ -109,18 +114,11 @@ export class GenerationPipeline {
         const isPreparePhase = level.some(m => m.phase === 'lifecycle-prepare')
 
         // 过滤禁用的中间件
-        const enabledMiddlewares: MiddlewareDefinition[] = []
-        for (const middleware of level) {
-          if (await this._isMiddlewareEnabled(middleware.name, context.channel)) {
-            enabledMiddlewares.push(middleware)
-          } else {
-            this._logger.debug(`Skipping disabled middleware: ${middleware.name}`)
-          }
-        }
+        const enabledMiddlewares = await this._getEnabledMiddlewares(level, context.channel)
 
         if (enabledMiddlewares.length === 0) {
-          // 即使没有中间件执行，也要在 prepare 阶段后调用回调
-          if (isPreparePhase && !preparePhaseCompleted) {
+          // 即使 prepare 阶段没有启用的中间件，也视为成功通过 prepare
+          if (this._shouldNotifyPrepareComplete(isPreparePhase, preparePhaseCompleted, null)) {
             preparePhaseCompleted = true
             await this._callPrepareCompleteCallback(request, context)
           }
@@ -128,29 +126,16 @@ export class GenerationPipeline {
         }
 
         const results = await this._executeLevel(enabledMiddlewares, context)
+        const levelOutcome = this._analyzeLevelResults(results, context)
 
-        // 如果是 lifecycle-prepare 阶段完成后，调用回调通知调用者
-        if (isPreparePhase && !preparePhaseCompleted) {
+        // 只有 prepare 阶段成功通过后，才通知调用者进入后续生成流程
+        if (this._shouldNotifyPrepareComplete(isPreparePhase, preparePhaseCompleted, levelOutcome)) {
           preparePhaseCompleted = true
           await this._callPrepareCompleteCallback(request, context)
         }
 
-        // 检查是否有停止或错误
-        for (const result of results) {
-          if (result.status === 'stop') {
-            this._logger.info(`Pipeline stopped by middleware: ${result.name}`)
-            earlyStopByMiddleware = true
-            break
-          }
-
-          if (result.status === 'error') {
-            this._logger.error(`Middleware error in ${result.name}:`, result.error)
-            // 将错误信息保存到上下文，供 finalize 阶段使用
-            context.error = result.error?.message ?? 'Unknown middleware error'
-            pipelineError = result.error ?? new Error('Unknown middleware error')
-            break
-          }
-        }
+        earlyStopByMiddleware = levelOutcome.stopped
+        pipelineError = levelOutcome.error
 
         // 如果有停止或错误，跳出循环
         if (earlyStopByMiddleware || pipelineError) break
@@ -364,6 +349,62 @@ export class GenerationPipeline {
     await Promise.all(promises)
 
     return results.filter(r => r !== undefined)
+  }
+
+  private async _getEnabledMiddlewares(
+    level: MiddlewareDefinition[],
+    channel: ChannelConfig | null
+  ): Promise<MiddlewareDefinition[]> {
+    const enabledMiddlewares: MiddlewareDefinition[] = []
+
+    for (const middleware of level) {
+      if (await this._isMiddlewareEnabled(middleware.name, channel)) {
+        enabledMiddlewares.push(middleware)
+      } else {
+        this._logger.debug(`Skipping disabled middleware: ${middleware.name}`)
+      }
+    }
+
+    return enabledMiddlewares
+  }
+
+  private _analyzeLevelResults(
+    results: MiddlewareResult[],
+    context: MiddlewareContext
+  ): LevelOutcome {
+    for (const result of results) {
+      if (result.status === 'error') {
+        this._logger.error(`Middleware error in ${result.name}:`, result.error)
+        context.error = result.error?.message ?? 'Unknown middleware error'
+        return {
+          stopped: false,
+          error: result.error ?? new Error('Unknown middleware error')
+        }
+      }
+
+      if (result.status === 'stop') {
+        this._logger.info(`Pipeline stopped by middleware: ${result.name}`)
+        return {
+          stopped: true,
+          error: null
+        }
+      }
+    }
+
+    return {
+      stopped: false,
+      error: null
+    }
+  }
+
+  private _shouldNotifyPrepareComplete(
+    isPreparePhase: boolean,
+    preparePhaseCompleted: boolean,
+    levelOutcome: LevelOutcome | null
+  ): boolean {
+    if (!isPreparePhase || preparePhaseCompleted) return false
+    if (!levelOutcome) return true
+    return !levelOutcome.stopped && !levelOutcome.error
   }
 
   /**

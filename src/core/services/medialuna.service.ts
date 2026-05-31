@@ -201,6 +201,7 @@ export class MediaLunaService extends Service {
     'task-recorder-prepare': { enabled: true, config: {} },
     'task-recorder-finalize': { enabled: true, config: {} },
     'preset': { enabled: true, config: {} },
+    'dalle-size-enhancer': { enabled: false, config: {} },
     'request': { enabled: true, config: {} },
     'storage': {
       enabled: true,

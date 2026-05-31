@@ -11,6 +11,7 @@ import censorBypassPlugin from './prompt-censor-bypass'
 import webuiAuthPlugin from './webui-auth'
 import koishiCommandsPlugin from './koishi-commands'
 import vitsPlugin from './vits'
+import dalleSizeEnhancerPlugin from './dalle-size-enhancer'
 
 // 连接器插件
 import dalleConnectorPlugin from './connector-dalle'
@@ -46,6 +47,7 @@ export const builtinPlugins: PluginDefinition[] = [
   webuiAuthPlugin,
   koishiCommandsPlugin,
   vitsPlugin,
+  dalleSizeEnhancerPlugin,
   // 连接器插件
   dalleConnectorPlugin,
   sdWebuiConnectorPlugin,
@@ -80,6 +82,7 @@ export {
   webuiAuthPlugin,
   koishiCommandsPlugin,
   vitsPlugin,
+  dalleSizeEnhancerPlugin,
   dalleConnectorPlugin,
   sdWebuiConnectorPlugin,
   fluxConnectorPlugin,
@@ -112,6 +115,7 @@ export type { CensorBypassConfig } from './prompt-censor-bypass'
 export type { WebuiAuthConfig } from './webui-auth'
 export type { KoishiCommandsConfig } from './koishi-commands'
 export type { VitsPluginConfig, VitsSpeaker, VitsSayOptions } from './vits'
+export type { DalleSizeEnhancerConfig } from './dalle-size-enhancer'
 export type { ChatLunaPluginConfig, ToolConfig, PresetToolConfig } from './connector-chatluna/config'
 export type { ChatLunaPromptEnhanceConfig } from './connector-chatluna/middleware'
 export type { MiddlewareConfig as ModelScopeMiddlewareConfig, LoraAlias as ModelScopeLoraAlias } from './plugin-modelscope/config'
@@ -125,4 +129,5 @@ export { MediaLunaVits, getChannelSpeakerIdBase, getSpeakerIdFromChannelId, getC
 
 // 导出中间件工厂
 export { createCensorBypassMiddleware } from './prompt-censor-bypass'
+export { createDalleSizeEnhancerMiddleware } from './dalle-size-enhancer'
 export { createChatLunaPromptEnhanceMiddleware } from './connector-chatluna/middleware'

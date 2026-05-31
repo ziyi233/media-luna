@@ -42,7 +42,8 @@
   ],
   "dependencies": {
     "@initencounter/vits": "^0.0.3",
-    "msedge-tts": "^2.0.3"
+    "msedge-tts": "^2.0.3",
+    "yaml": "^2.9.0"
   },
   "devDependencies": {
     "@koishijs/client": "^5.30.0",

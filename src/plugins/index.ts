@@ -72,40 +72,6 @@ export const builtinPlugins: PluginDefinition[] = [
   modelscopePlugin
 ]
 
-// 单独导出插件（用于外部引用）
-export {
-  cachePlugin,
-  presetPlugin,
-  billingPlugin,
-  taskPlugin,
-  censorBypassPlugin,
-  webuiAuthPlugin,
-  koishiCommandsPlugin,
-  vitsPlugin,
-  dalleSizeEnhancerPlugin,
-  dalleConnectorPlugin,
-  sdWebuiConnectorPlugin,
-  fluxConnectorPlugin,
-  chatApiConnectorPlugin,
-  geminiConnectorPlugin,
-  vertexAIConnectorPlugin,
-  midjourneyConnectorPlugin,
-  stabilityConnectorPlugin,
-  sunoConnectorPlugin,
-  runwayConnectorPlugin,
-  comfyuiConnectorPlugin,
-  chatlunaConnectorPlugin,
-  testConnectorPlugin,
-  doubaoConnectorPlugin,
-  minimaxConnectorPlugin,
-  edgeTTSConnectorPlugin,
-  openaiTTSConnectorPlugin,
-  azureTTSConnectorPlugin,
-  volcengineTTSConnectorPlugin,
-  peintureConnectorPlugin,
-  modelscopePlugin
-}
-
 // 导出类型
 export type { StorageConfig, LocalCacheConfig } from './cache'
 export type { PresetPluginConfig, PresetMiddlewareConfig, RemoteSyncConfig } from './preset'

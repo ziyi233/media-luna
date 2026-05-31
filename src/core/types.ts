@@ -397,6 +397,16 @@ export interface PluginContext {
   onDispose(callback: () => void): void
 }
 
+/** 插件贡献项 */
+export interface PluginContributions {
+  /** 中间件贡献 */
+  middlewares?: MiddlewareDefinition[]
+  /** 连接器贡献 */
+  connectors?: ConnectorDefinition[]
+  /** 服务贡献 */
+  services?: ServiceDefinition[]
+}
+
 /** 插件定义 */
 export interface PluginDefinition {
   /** 插件唯一标识 */
@@ -412,7 +422,13 @@ export interface PluginDefinition {
   /** Koishi 服务注入声明 */
   inject?: string[]
 
-  // 注册项
+  /**
+   * 插件贡献项。
+   * 新插件优先使用 contributes；旧的 middlewares/connector/services 字段仍保留兼容。
+   */
+  contributes?: PluginContributions
+
+  // 注册项（向后兼容）
   middlewares?: MiddlewareDefinition[]
   connector?: ConnectorDefinition
   services?: ServiceDefinition[]

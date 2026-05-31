@@ -26,7 +26,28 @@ interface LoadedPlugin {
   disposeCallbacks: Array<() => void>
   registeredMiddlewares: string[]
   registeredServices: string[]
-  connectorId?: string
+  connectorIds: string[]
+}
+
+function getPluginMiddlewares(definition: PluginDefinition): MiddlewareDefinition[] {
+  return [
+    ...(definition.middlewares || []),
+    ...(definition.contributes?.middlewares || [])
+  ]
+}
+
+function getPluginConnectors(definition: PluginDefinition): ConnectorDefinition[] {
+  return [
+    ...(definition.connector ? [definition.connector] : []),
+    ...(definition.contributes?.connectors || [])
+  ]
+}
+
+function getPluginServices(definition: PluginDefinition): ServiceDefinition[] {
+  return [
+    ...(definition.services || []),
+    ...(definition.contributes?.services || [])
+  ]
 }
 
 /**
@@ -146,8 +167,9 @@ export class PluginLoader {
       const pluginContext = this._createPluginContext(id, disposeCallbacks)
 
       // 注册服务
-      if (definition.services) {
-        for (const serviceDef of definition.services) {
+      const services = getPluginServices(definition)
+      if (services.length > 0) {
+        for (const serviceDef of services) {
           const service = serviceDef.factory(pluginContext)
           const dispose = this._serviceRegistry.register(serviceDef.name, service)
           disposeCallbacks.push(dispose)
@@ -157,8 +179,9 @@ export class PluginLoader {
       }
 
       // 注册中间件
-      if (definition.middlewares) {
-        for (const middleware of definition.middlewares) {
+      const middlewares = getPluginMiddlewares(definition)
+      if (middlewares.length > 0) {
+        for (const middleware of middlewares) {
           const dispose = this._middlewareRegistry.register(middleware)
           disposeCallbacks.push(dispose)
           registeredMiddlewares.push(middleware.name)
@@ -167,12 +190,15 @@ export class PluginLoader {
       }
 
       // 注册连接器
-      let connectorId: string | undefined
-      if (definition.connector) {
-        const dispose = this._connectorRegistry.register(definition.connector)
-        disposeCallbacks.push(dispose)
-        connectorId = definition.connector.id
-        this._logger.debug('Registered connector: %s (plugin: %s)', connectorId, id)
+      const connectorIds: string[] = []
+      const connectors = getPluginConnectors(definition)
+      if (connectors.length > 0) {
+        for (const connector of connectors) {
+          const dispose = this._connectorRegistry.register(connector)
+          disposeCallbacks.push(dispose)
+          connectorIds.push(connector.id)
+          this._logger.debug('Registered connector: %s (plugin: %s)', connector.id, id)
+        }
       }
 
       // 创建已加载插件状态
@@ -183,7 +209,7 @@ export class PluginLoader {
         disposeCallbacks,
         registeredMiddlewares,
         registeredServices,
-        connectorId
+        connectorIds
       }
 
       this._plugins.set(id, loadedPlugin)
@@ -324,7 +350,7 @@ export class PluginLoader {
    */
   isConnectorEnabled(connectorId: string): boolean {
     for (const [_, plugin] of this._plugins) {
-      if (plugin.connectorId === connectorId) {
+      if (plugin.connectorIds.includes(connectorId)) {
         return plugin.enabled
       }
     }
@@ -357,12 +383,14 @@ export class PluginLoader {
       const config = this._configService.get<Record<string, any>>(`plugin:${id}`)
 
       // 获取中间件状态
-      const middlewares = (def.middlewares || []).map(mw => ({
+      const middlewares = getPluginMiddlewares(def).map(mw => ({
         name: mw.name,
         displayName: mw.displayName,
         phase: mw.phase,
         enabled: this._middlewareRegistry.has(mw.name) && plugin.enabled
       }))
+      const connectors = getPluginConnectors(def)
+      const [connector] = connectors
 
       result.push({
         id,
@@ -374,10 +402,10 @@ export class PluginLoader {
         config,
         actions: def.settingsActions || [],
         middlewares,
-        connector: def.connector ? {
-          id: def.connector.id,
-          name: def.connector.name,
-          supportedTypes: def.connector.supportedTypes
+        connector: connector ? {
+          id: connector.id,
+          name: connector.name,
+          supportedTypes: connector.supportedTypes
         } : undefined,
         presets: def.presets
       })
@@ -446,9 +474,10 @@ export class PluginLoader {
 
     try {
       // 重新注册服务
-      if (plugin.definition.services) {
+      const services = getPluginServices(plugin.definition)
+      if (services.length > 0) {
         const tempContext = this._createPluginContext(id, newDisposeCallbacks)
-        for (const serviceDef of plugin.definition.services) {
+        for (const serviceDef of services) {
           const service = serviceDef.factory(tempContext)
           const dispose = this._serviceRegistry.register(serviceDef.name, service)
           newDisposeCallbacks.push(dispose)
@@ -458,8 +487,9 @@ export class PluginLoader {
       }
 
       // 重新注册中间件
-      if (plugin.definition.middlewares) {
-        for (const middleware of plugin.definition.middlewares) {
+      const middlewares = getPluginMiddlewares(plugin.definition)
+      if (middlewares.length > 0) {
+        for (const middleware of middlewares) {
           const dispose = this._middlewareRegistry.register(middleware)
           newDisposeCallbacks.push(dispose)
           newRegisteredMiddlewares.push(middleware.name)
@@ -468,10 +498,15 @@ export class PluginLoader {
       }
 
       // 重新注册连接器
-      if (plugin.definition.connector) {
-        const dispose = this._connectorRegistry.register(plugin.definition.connector)
-        newDisposeCallbacks.push(dispose)
-        this._logger.debug('Re-registered connector: %s (plugin: %s)', plugin.definition.connector.id, id)
+      const connectorIds: string[] = []
+      const connectors = getPluginConnectors(plugin.definition)
+      if (connectors.length > 0) {
+        for (const connector of connectors) {
+          const dispose = this._connectorRegistry.register(connector)
+          newDisposeCallbacks.push(dispose)
+          connectorIds.push(connector.id)
+          this._logger.debug('Re-registered connector: %s (plugin: %s)', connector.id, id)
+        }
       }
 
       // 4. 重新创建上下文并调用 onLoad
@@ -486,6 +521,7 @@ export class PluginLoader {
       plugin.disposeCallbacks = newDisposeCallbacks
       plugin.registeredMiddlewares = newRegisteredMiddlewares
       plugin.registeredServices = newRegisteredServices
+      plugin.connectorIds = connectorIds
 
       this._logger.info('Plugin reloaded: %s', id)
     } catch (e) {

@@ -424,17 +424,9 @@ export interface PluginDefinition {
 
   /**
    * 插件贡献项。
-   * 新插件优先使用 contributes；旧的 middlewares/connector/services 字段仍保留兼容。
+   * 插件通过 contributes 声明其注册的连接器、中间件和服务。
    */
   contributes?: PluginContributions
-
-  // 注册项（向后兼容，已废弃，请使用 contributes）
-  /** @deprecated 请使用 contributes.middlewares */
-  middlewares?: MiddlewareDefinition[]
-  /** @deprecated 请使用 contributes.connectors */
-  connector?: ConnectorDefinition
-  /** @deprecated 请使用 contributes.services */
-  services?: ServiceDefinition[]
 
   // 配置
   configFields?: ConfigField[]

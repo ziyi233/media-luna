@@ -30,24 +30,15 @@ interface LoadedPlugin {
 }
 
 function getPluginMiddlewares(definition: PluginDefinition): MiddlewareDefinition[] {
-  return [
-    ...(definition.middlewares || []),
-    ...(definition.contributes?.middlewares || [])
-  ]
+  return definition.contributes?.middlewares || []
 }
 
 function getPluginConnectors(definition: PluginDefinition): ConnectorDefinition[] {
-  return [
-    ...(definition.connector ? [definition.connector] : []),
-    ...(definition.contributes?.connectors || [])
-  ]
+  return definition.contributes?.connectors || []
 }
 
 function getPluginServices(definition: PluginDefinition): ServiceDefinition[] {
-  return [
-    ...(definition.services || []),
-    ...(definition.contributes?.services || [])
-  ]
+  return definition.contributes?.services || []
 }
 
 /**

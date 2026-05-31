@@ -13,25 +13,26 @@ export default definePlugin({
   description: '预设模板和远程同步支持',
   version: '1.0.0',
 
-  services: [
-    {
-      name: 'preset',
-      factory: (ctx) => new PresetService(ctx.ctx)
-    },
-    {
-      name: 'remote-sync',
-      factory: (ctx) => {
-        const presetService = ctx.getService<PresetService>('preset')!
-        // 提供一个获取缓存服务的回调，避免直接访问 ctx.mediaLuna 导致的警告
-        const getCacheService = () => ctx.getService<CacheService>('cache')
-        return new RemoteSyncService(ctx.ctx, presetService, getCacheService)
+  contributes: {
+    services: [
+      {
+        name: 'preset',
+        factory: (ctx) => new PresetService(ctx.ctx)
+      },
+      {
+        name: 'remote-sync',
+        factory: (ctx) => {
+          const presetService = ctx.getService<PresetService>('preset')!
+          // 提供一个获取缓存服务的回调，避免直接访问 ctx.mediaLuna 导致的警告
+          const getCacheService = () => ctx.getService<CacheService>('cache')
+          return new RemoteSyncService(ctx.ctx, presetService, getCacheService)
+        }
       }
-    }
-  ],
-
-  middlewares: [
-    createPresetMiddleware()
-  ],
+    ],
+    middlewares: [
+      createPresetMiddleware()
+    ]
+  },
 
   configFields: presetConfigFields,
   configDefaults: defaultPresetConfig,

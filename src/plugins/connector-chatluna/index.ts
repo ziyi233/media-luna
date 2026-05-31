@@ -17,13 +17,12 @@ export default definePlugin({
   description: 'ChatLuna 集成：使用 ChatLuna 模型生成图像，支持工具注册和提示词润色',
   version: '1.0.0',
 
-  // 声明式连接器注册
-  connector: ChatLunaConnector,
-
-  // 声明式中间件注册
-  middlewares: [
-    createChatLunaPromptEnhanceMiddleware()
-  ],
+  contributes: {
+    connectors: [ChatLunaConnector],
+    middlewares: [
+      createChatLunaPromptEnhanceMiddleware()
+    ]
+  },
 
   // 配置字段
   configFields: chatlunaConfigFields,

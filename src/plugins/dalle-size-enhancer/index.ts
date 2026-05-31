@@ -15,9 +15,11 @@ export default definePlugin({
   configFields: dalleSizeEnhancerConfigFields,
   configDefaults: defaultDalleSizeEnhancerConfig,
 
-  middlewares: [
-    createDalleSizeEnhancerMiddleware()
-  ],
+  contributes: {
+    middlewares: [
+      createDalleSizeEnhancerMiddleware()
+    ]
+  },
 
   async onLoad(pluginCtx) {
     pluginCtx.logger.info('DALL-E size enhancer plugin loaded')

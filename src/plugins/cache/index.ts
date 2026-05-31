@@ -13,20 +13,21 @@ export default definePlugin({
   description: '本地文件缓存和外部存储支持（S3/WebDAV）',
   version: '1.0.0',
 
-  services: [
-    {
-      name: 'cache',
-      factory: (ctx) => {
-        const config = ctx.getConfig<CachePluginConfig>()
-        return new CacheService(ctx.ctx, { ...defaultCacheConfig, ...config })
+  contributes: {
+    services: [
+      {
+        name: 'cache',
+        factory: (ctx) => {
+          const config = ctx.getConfig<CachePluginConfig>()
+          return new CacheService(ctx.ctx, { ...defaultCacheConfig, ...config })
+        }
       }
-    }
-  ],
-
-  middlewares: [
-    createStorageInputMiddleware(),
-    createStorageMiddleware()
-  ],
+    ],
+    middlewares: [
+      createStorageInputMiddleware(),
+      createStorageMiddleware()
+    ]
+  },
 
   // 所有配置都在"扩展插件"面板显示
   configFields: cacheConfigFields,

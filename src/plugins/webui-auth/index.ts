@@ -17,12 +17,14 @@ export default definePlugin({
   configFields: webuiAuthConfigFields,
   configDefaults: defaultWebuiAuthConfig,
 
-  services: [
-    {
-      name: 'webui-auth',
-      factory: (pluginCtx) => new WebuiAuthService(pluginCtx)
-    }
-  ],
+  contributes: {
+    services: [
+      {
+        name: 'webui-auth',
+        factory: (pluginCtx) => new WebuiAuthService(pluginCtx)
+      }
+    ]
+  },
 
   settingsActions: [
     {

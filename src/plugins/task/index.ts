@@ -11,17 +11,18 @@ export default definePlugin({
   description: '记录生成任务的详细信息和状态',
   version: '1.0.0',
 
-  services: [
-    {
-      name: 'task',
-      factory: (ctx) => new TaskService(ctx.ctx)
-    }
-  ],
-
-  middlewares: [
-    createTaskRecorderPrepareMiddleware(),
-    createTaskRecorderFinalizeMiddleware()
-  ],
+  contributes: {
+    services: [
+      {
+        name: 'task',
+        factory: (ctx) => new TaskService(ctx.ctx)
+      }
+    ],
+    middlewares: [
+      createTaskRecorderPrepareMiddleware(),
+      createTaskRecorderFinalizeMiddleware()
+    ]
+  },
 
   configFields: taskConfigFields,
   configDefaults: defaultTaskConfig,

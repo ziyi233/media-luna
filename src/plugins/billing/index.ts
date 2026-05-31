@@ -11,17 +11,18 @@ export default definePlugin({
   description: '用户余额扣费和退款支持',
   version: '1.0.0',
 
-  middlewares: [
-    createBillingPrepareMiddleware(),
-    createBillingFinalizeMiddleware()
-  ],
-
-  services: [
-    {
-      name: 'billing',
-      factory: (pluginCtx) => new BillingService(pluginCtx)
-    }
-  ],
+  contributes: {
+    middlewares: [
+      createBillingPrepareMiddleware(),
+      createBillingFinalizeMiddleware()
+    ],
+    services: [
+      {
+        name: 'billing',
+        factory: (pluginCtx) => new BillingService(pluginCtx)
+      }
+    ]
+  },
 
   configFields: billingConfigFields,
   configDefaults: defaultBillingConfig,

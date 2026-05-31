@@ -18,9 +18,11 @@ export default definePlugin({
   configFields: censorBypassConfigFields,
   configDefaults: defaultCensorBypassConfig,
 
-  middlewares: [
-    createCensorBypassMiddleware()
-  ],
+  contributes: {
+    middlewares: [
+      createCensorBypassMiddleware()
+    ]
+  },
 
   async onLoad(ctx) {
     ctx.logger.info('Censor bypass plugin loaded')

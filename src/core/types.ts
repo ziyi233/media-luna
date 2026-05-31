@@ -428,9 +428,12 @@ export interface PluginDefinition {
    */
   contributes?: PluginContributions
 
-  // 注册项（向后兼容）
+  // 注册项（向后兼容，已废弃，请使用 contributes）
+  /** @deprecated 请使用 contributes.middlewares */
   middlewares?: MiddlewareDefinition[]
+  /** @deprecated 请使用 contributes.connectors */
   connector?: ConnectorDefinition
+  /** @deprecated 请使用 contributes.services */
   services?: ServiceDefinition[]
 
   // 配置

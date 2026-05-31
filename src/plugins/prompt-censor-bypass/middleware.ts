@@ -130,9 +130,9 @@ export function createCensorBypassMiddleware(): MiddlewareDefinition {
     phase: 'lifecycle-pre-request',
     after: ['preset'], // 确保在预设处理之后运行
 
-    async execute(mctx: MiddlewareContext, next) {
+    async execute(context: MiddlewareContext, next) {
       // 获取配置
-      const mwConfig = await mctx.getMiddlewareConfig<CensorBypassConfig>('prompt-censor-bypass')
+      const mwConfig = await context.getMiddlewareConfig<CensorBypassConfig>('prompt-censor-bypass')
       const config: CensorBypassConfig = {
         ...defaultCensorBypassConfig,
         ...(mwConfig || {})
@@ -144,13 +144,13 @@ export function createCensorBypassMiddleware(): MiddlewareDefinition {
         : []
 
       // 获取渠道标签
-      const channelTags = (mctx.channel?.tags || []).map(t => t.toLowerCase())
+      const channelTags = (context.channel?.tags || []).map(t => t.toLowerCase())
 
       // 检查是否匹配渠道标签
       const shouldApply = matchTags.length === 0 || matchTags.some(tag => channelTags.includes(tag))
 
       // 调试日志：输出配置
-      mctx.setMiddlewareLog('prompt-censor-bypass-debug', {
+      context.setMiddlewareLog('prompt-censor-bypass-debug', {
         mwConfigReceived: !!mwConfig,
         matchTags,
         channelTags,
@@ -161,19 +161,19 @@ export function createCensorBypassMiddleware(): MiddlewareDefinition {
 
       // 如果不匹配渠道标签，跳过
       if (!shouldApply) {
-        mctx.setMiddlewareLog('prompt-censor-bypass', { skipped: true, reason: 'channel tags not matched' })
+        context.setMiddlewareLog('prompt-censor-bypass', { skipped: true, reason: 'channel tags not matched' })
         return next()
       }
 
       // 如果两个功能都未启用，直接跳过
       if (!config.enablePrefixPrompt && !config.enableUnicodeEscape) {
-        mctx.setMiddlewareLog('prompt-censor-bypass', { skipped: true, reason: 'both features disabled' })
+        context.setMiddlewareLog('prompt-censor-bypass', { skipped: true, reason: 'both features disabled' })
         return next()
       }
 
       // 处理 prompt
-      if (mctx.prompt) {
-        let processedPrompt = mctx.prompt
+      if (context.prompt) {
+        let processedPrompt = context.prompt
         const logInfo: Record<string, any> = {}
 
         // 1. 先注入前置提示词（在编码之前）
@@ -197,8 +197,8 @@ export function createCensorBypassMiddleware(): MiddlewareDefinition {
         }
 
         if (Object.keys(logInfo).length > 0) {
-          mctx.setMiddlewareLog('prompt-censor-bypass', logInfo)
-          mctx.prompt = processedPrompt
+          context.setMiddlewareLog('prompt-censor-bypass', logInfo)
+          context.prompt = processedPrompt
         }
       }
 

@@ -57,20 +57,20 @@ function getMessageTemplate(config: BillingConfig | null, key: keyof BillingConf
 /** 获取用户 ID（通过 Koishi binding 表查询） */
 async function resolveUserId(
   ctx: Context,
-  mctx: MiddlewareContext
+  context: MiddlewareContext
 ): Promise<number | null> {
-  // 优先使用 mctx.uid（来自生成请求）
-  if (mctx.uid) {
-    return mctx.uid
+  // 优先使用 context.uid（来自生成请求）
+  if (context.uid) {
+    return context.uid
   }
 
   // 否则从 session 解析
-  if (!mctx.session) return null
+  if (!context.session) return null
 
   try {
     const bindings = await ctx.database.get('binding', {
-      platform: mctx.session.platform,
-      pid: mctx.session.userId
+      platform: context.session.platform,
+      pid: context.session.userId
     })
     return bindings[0]?.aid ?? null
   } catch {
@@ -156,9 +156,9 @@ export function createBillingPrepareMiddleware(): MiddlewareDefinition {
     configGroup: 'billing',
     cardFields: billingCardFields,
 
-    async execute(mctx: MiddlewareContext, next): Promise<MiddlewareRunStatus> {
-      const config = await mctx.getMiddlewareConfig<BillingConfig>('billing')
-      const logger = mctx.ctx.logger('media-luna')
+    async execute(context: MiddlewareContext, next): Promise<MiddlewareRunStatus> {
+      const config = await context.getMiddlewareConfig<BillingConfig>('billing')
+      const logger = context.ctx.logger('media-luna')
 
       // 调试日志：打印读取到的配置
       logger.info('[billing-prepare] config: %o', {
@@ -176,7 +176,7 @@ export function createBillingPrepareMiddleware(): MiddlewareDefinition {
 
       // cost = 0 表示免费渠道，跳过计费检查
       if (cost <= 0) {
-        mctx.setMiddlewareLog('billing-prepare', { skipped: true, reason: 'free channel', cost })
+        context.setMiddlewareLog('billing-prepare', { skipped: true, reason: 'free channel', cost })
         return next()
       }
 
@@ -188,7 +188,7 @@ export function createBillingPrepareMiddleware(): MiddlewareDefinition {
         if (!config?.tableName) missing.push('tableName')
         if (!config?.userIdField) missing.push('userIdField')
         if (!config?.balanceField) missing.push('balanceField')
-        mctx.setMiddlewareLog('billing-prepare', {
+        context.setMiddlewareLog('billing-prepare', {
           error: true,
           reason: 'database config missing',
           missing
@@ -197,9 +197,9 @@ export function createBillingPrepareMiddleware(): MiddlewareDefinition {
       }
 
       // 解析用户 ID
-      const userId = await resolveUserId(mctx.ctx, mctx)
+      const userId = await resolveUserId(context.ctx, context)
       if (!userId) {
-        mctx.setMiddlewareLog('billing-prepare', { error: true, reason: 'no user id' })
+        context.setMiddlewareLog('billing-prepare', { error: true, reason: 'no user id' })
         throw new Error('无法识别用户身份，请先绑定账号')
       }
 
@@ -209,7 +209,7 @@ export function createBillingPrepareMiddleware(): MiddlewareDefinition {
 
       try {
         // 查询余额
-        const balance = await getBalance(mctx.ctx, config, userId, currencyValue)
+        const balance = await getBalance(context.ctx, config, userId, currencyValue)
 
         // 检查余额是否充足
         if (balance < cost) {
@@ -218,7 +218,7 @@ export function createBillingPrepareMiddleware(): MiddlewareDefinition {
             getMessageTemplate(config, 'msgInsufficientBalance'),
             { cost, balance, label: currencyLabel }
           )
-          mctx.setMiddlewareLog('billing-prepare', {
+          context.setMiddlewareLog('billing-prepare', {
             error: true,
             reason: 'insufficient balance',
             balance,
@@ -229,13 +229,13 @@ export function createBillingPrepareMiddleware(): MiddlewareDefinition {
         }
 
         // 扣费
-        await updateBalance(mctx.ctx, config, userId, -cost, currencyValue)
+        await updateBalance(context.ctx, config, userId, -cost, currencyValue)
 
         // 记录扣费信息到 store，供 finalize 阶段使用
-        mctx.store.set(STORE_KEY, true)
-        mctx.store.set(STORE_AMOUNT_KEY, cost)
-        mctx.store.set(STORE_USER_KEY, userId)
-        mctx.store.set(STORE_CURRENCY_KEY, currencyValue)
+        context.store.set(STORE_KEY, true)
+        context.store.set(STORE_AMOUNT_KEY, cost)
+        context.store.set(STORE_USER_KEY, userId)
+        context.store.set(STORE_CURRENCY_KEY, currencyValue)
 
         // 添加用户提示（生成前）- 使用配置的预扣费提示模板
         const newBalance = balance - cost
@@ -243,9 +243,9 @@ export function createBillingPrepareMiddleware(): MiddlewareDefinition {
           getMessageTemplate(config, 'msgPreCharge'),
           { cost, balance: newBalance, label: currencyLabel }
         )
-        mctx.addUserHint(preChargeMsg, 'before')
+        context.addUserHint(preChargeMsg, 'before')
 
-        mctx.setMiddlewareLog('billing-prepare', {
+        context.setMiddlewareLog('billing-prepare', {
           charged: cost,
           userId,
           currency: currencyValue,
@@ -255,7 +255,7 @@ export function createBillingPrepareMiddleware(): MiddlewareDefinition {
 
         return next()
       } catch (error) {
-        mctx.setMiddlewareLog('billing-prepare', {
+        context.setMiddlewareLog('billing-prepare', {
           error: true,
           message: error instanceof Error ? error.message : 'Unknown error'
         })
@@ -278,29 +278,29 @@ export function createBillingFinalizeMiddleware(): MiddlewareDefinition {
     phase: 'lifecycle-finalize',
     configGroup: 'billing',
 
-    async execute(mctx: MiddlewareContext, next): Promise<MiddlewareRunStatus> {
-      const config = await mctx.getMiddlewareConfig<BillingConfig>('billing')
+    async execute(context: MiddlewareContext, next): Promise<MiddlewareRunStatus> {
+      const config = await context.getMiddlewareConfig<BillingConfig>('billing')
       const currencyLabel = config?.currencyLabel || '积分'
 
       // 检查是否已扣费
-      const wasCharged = mctx.store.get(STORE_KEY)
+      const wasCharged = context.store.get(STORE_KEY)
       if (!wasCharged) {
         return next()
       }
 
-      const chargedAmount = mctx.store.get(STORE_AMOUNT_KEY) as number
-      const storedUserId = mctx.store.get(STORE_USER_KEY) as number
-      const currencyValue = mctx.store.get(STORE_CURRENCY_KEY) as string
+      const chargedAmount = context.store.get(STORE_AMOUNT_KEY) as number
+      const storedUserId = context.store.get(STORE_USER_KEY) as number
+      const currencyValue = context.store.get(STORE_CURRENCY_KEY) as string
 
       // 判断生成是否成功
-      const isSuccess = mctx.output && mctx.output.length > 0
+      const isSuccess = context.output && context.output.length > 0
 
       if (isSuccess) {
         // 生成成功，确认扣费
         // 查询当前余额
         let currentBalance: number | null = null
         try {
-          currentBalance = await getBalance(mctx.ctx, config!, storedUserId, currencyValue)
+          currentBalance = await getBalance(context.ctx, config!, storedUserId, currencyValue)
         } catch (e) {
           // 查询失败不影响主流程
         }
@@ -310,9 +310,9 @@ export function createBillingFinalizeMiddleware(): MiddlewareDefinition {
           getMessageTemplate(config, 'msgSuccess'),
           { cost: chargedAmount, balance: currentBalance, label: currencyLabel }
         )
-        mctx.addUserHint(successMsg, 'after')
+        context.addUserHint(successMsg, 'after')
 
-        mctx.setMiddlewareLog('billing-finalize', {
+        context.setMiddlewareLog('billing-finalize', {
           confirmed: chargedAmount,
           userId: storedUserId,
           currency: currencyValue,
@@ -321,12 +321,12 @@ export function createBillingFinalizeMiddleware(): MiddlewareDefinition {
       } else if (config?.refundOnFail !== false) {
         // 生成失败且启用了失败退款，执行退款
         try {
-          await updateBalance(mctx.ctx, config!, storedUserId, chargedAmount, currencyValue)
+          await updateBalance(context.ctx, config!, storedUserId, chargedAmount, currencyValue)
 
           // 查询退款后余额
           let currentBalance: number | null = null
           try {
-            currentBalance = await getBalance(mctx.ctx, config!, storedUserId, currencyValue)
+            currentBalance = await getBalance(context.ctx, config!, storedUserId, currencyValue)
           } catch (e) {
             // 查询失败不影响主流程
           }
@@ -336,9 +336,9 @@ export function createBillingFinalizeMiddleware(): MiddlewareDefinition {
             getMessageTemplate(config, 'msgRefunded'),
             { cost: chargedAmount, balance: currentBalance, label: currencyLabel }
           )
-          mctx.addUserHint(refundedMsg, 'after')
+          context.addUserHint(refundedMsg, 'after')
 
-          mctx.setMiddlewareLog('billing-finalize', {
+          context.setMiddlewareLog('billing-finalize', {
             refunded: chargedAmount,
             reason: 'generation failed',
             userId: storedUserId,
@@ -351,9 +351,9 @@ export function createBillingFinalizeMiddleware(): MiddlewareDefinition {
             getMessageTemplate(config, 'msgRefundFailed'),
             { error: error instanceof Error ? error.message : '未知错误' }
           )
-          mctx.addUserHint(refundFailedMsg, 'after')
+          context.addUserHint(refundFailedMsg, 'after')
 
-          mctx.setMiddlewareLog('billing-finalize', {
+          context.setMiddlewareLog('billing-finalize', {
             refundFailed: true,
             amount: chargedAmount,
             error: error instanceof Error ? error.message : 'Unknown error'
@@ -365,9 +365,9 @@ export function createBillingFinalizeMiddleware(): MiddlewareDefinition {
           getMessageTemplate(config, 'msgNoRefund'),
           { cost: chargedAmount, label: currencyLabel }
         )
-        mctx.addUserHint(noRefundMsg, 'after')
+        context.addUserHint(noRefundMsg, 'after')
 
-        mctx.setMiddlewareLog('billing-finalize', {
+        context.setMiddlewareLog('billing-finalize', {
           noRefund: true,
           reason: 'refundOnFail disabled',
           charged: chargedAmount,

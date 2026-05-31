@@ -42,14 +42,14 @@ function normalizeConfig(config: DalleSizeEnhancerConfig): DalleSizeEnhancerConf
   }
 }
 
-function isChannelMatched(mctx: MiddlewareContext, config: DalleSizeEnhancerConfig): boolean {
+function isChannelMatched(context: MiddlewareContext, config: DalleSizeEnhancerConfig): boolean {
   const matchTags = config.matchChannelTags
     ? config.matchChannelTags.split(',').map(tag => tag.trim().toLowerCase()).filter(Boolean)
     : []
 
   if (matchTags.length === 0) return true
 
-  const channelTags = (mctx.channel?.tags || []).map(tag => tag.toLowerCase())
+  const channelTags = (context.channel?.tags || []).map(tag => tag.toLowerCase())
   return matchTags.some(tag => channelTags.includes(tag))
 }
 
@@ -271,49 +271,49 @@ export function createDalleSizeEnhancerMiddleware(): MiddlewareDefinition {
     before: ['request'],
     configGroup: 'dalle-size-enhancer',
 
-    async execute(mctx, next) {
-      const mwConfig = await mctx.getMiddlewareConfig<DalleSizeEnhancerConfig>('dalle-size-enhancer')
+    async execute(context, next) {
+      const mwConfig = await context.getMiddlewareConfig<DalleSizeEnhancerConfig>('dalle-size-enhancer')
       const config = normalizeConfig({
         ...defaultDalleSizeEnhancerConfig,
         ...(mwConfig || {})
       })
 
-      if (!isChannelMatched(mctx, config)) {
-        mctx.setMiddlewareLog('dalle-size-enhancer', { skipped: true, reason: 'channel tags not matched' })
+      if (!isChannelMatched(context, config)) {
+        context.setMiddlewareLog('dalle-size-enhancer', { skipped: true, reason: 'channel tags not matched' })
         return next()
       }
 
-      const promptDetection = parseSizeFromPrompt(mctx.prompt || '', config)
+      const promptDetection = parseSizeFromPrompt(context.prompt || '', config)
       const detection = promptDetection || (config.autoFromFirstImage
-        ? detectSizeFromFirstImage(mctx.files || [], config)
+        ? detectSizeFromFirstImage(context.files || [], config)
         : null)
 
       if (!detection) {
-        mctx.setMiddlewareLog('dalle-size-enhancer', { skipped: true, reason: 'size not detected' })
+        context.setMiddlewareLog('dalle-size-enhancer', { skipped: true, reason: 'size not detected' })
         return next()
       }
 
       const size = formatSize(detection.size)
-      mctx.parameters = {
-        ...mctx.parameters,
+      context.parameters = {
+        ...context.parameters,
         size
       }
 
-      if (mctx.channel) {
-        mctx.channel.connectorConfig = {
-          ...mctx.channel.connectorConfig,
+      if (context.channel) {
+        context.channel.connectorConfig = {
+          ...context.channel.connectorConfig,
           size
         }
       }
 
       if (config.removeSizeFromPrompt && promptDetection?.token) {
-        const cleanPrompt = cleanPromptSizeToken(mctx.prompt, promptDetection.token)
+        const cleanPrompt = cleanPromptSizeToken(context.prompt, promptDetection.token)
         if (cleanPrompt) {
-          mctx.prompt = cleanPrompt
+          context.prompt = cleanPrompt
         }
       }
 
-      mctx.setMiddlewareLog('dalle-size-enhancer', {
+      context.setMiddlewareLog('dalle-size-enhancer', {
         size,
         source: detection.source,
         token: detection.token?.trim(),

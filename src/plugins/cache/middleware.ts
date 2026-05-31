@@ -74,10 +74,10 @@ async function uploadToBackend(
   buffer: Buffer,
   filename: string,
   mime: string,
-  mctx: MiddlewareContext,
+  context: MiddlewareContext,
   schemeName?: string
 ): Promise<{ url: string; key: string }> {
-  const cacheService = mctx.getService<CacheService>('cache')
+  const cacheService = context.getService<CacheService>('cache')
   if (!cacheService) {
     throw new Error('缓存服务不可用')
   }
@@ -104,9 +104,9 @@ export function createStorageInputMiddleware(): MiddlewareDefinition {
     configGroup: 'cache',  // 关联到 plugin:cache 配置
     phase: 'lifecycle-prepare',
 
-    async execute(mctx: MiddlewareContext, next): Promise<MiddlewareRunStatus> {
+    async execute(context: MiddlewareContext, next): Promise<MiddlewareRunStatus> {
       // 获取缓存服务
-      const cacheService = mctx.getService<CacheService>('cache')
+      const cacheService = context.getService<CacheService>('cache')
       if (!cacheService) {
         return next()
       }
@@ -117,20 +117,20 @@ export function createStorageInputMiddleware(): MiddlewareDefinition {
       }
 
       // 没有文件时跳过
-      if (!mctx.files || mctx.files.length === 0) {
+      if (!context.files || context.files.length === 0) {
         return next()
       }
 
       // 获取中间件配置的存储方案
-      const middlewareConfig = await mctx.getMiddlewareConfig<StorageMiddlewareConfig>('storage-input')
+      const middlewareConfig = await context.getMiddlewareConfig<StorageMiddlewareConfig>('storage-input')
       const schemeName = middlewareConfig?.schemeName || undefined
       const backend = cacheService.getSchemeBackend(schemeName)
 
       const uploadLogs: Array<{ index: number; filename: string; url?: string; error?: string }> = []
       const uploadedUrls: string[] = []
 
-      for (let i = 0; i < mctx.files.length; i++) {
-        const file = mctx.files[i]
+      for (let i = 0; i < context.files.length; i++) {
+        const file = context.files[i]
 
         if (!file.data || file.data.byteLength === 0) {
           continue
@@ -141,7 +141,7 @@ export function createStorageInputMiddleware(): MiddlewareDefinition {
           const ext = getExtensionFromMime(file.mime)
           const filename = `input-${i}${ext}`
 
-          const result = await uploadToBackend(buffer, filename, file.mime, mctx, schemeName)
+          const result = await uploadToBackend(buffer, filename, file.mime, context, schemeName)
 
           uploadedUrls.push(result.url)
           uploadLogs.push({ index: i, filename: file.filename, url: result.url })
@@ -155,13 +155,13 @@ export function createStorageInputMiddleware(): MiddlewareDefinition {
       }
 
       if (uploadedUrls.length > 0) {
-        mctx.store.set('inputFileUrls', uploadedUrls)
+        context.store.set('inputFileUrls', uploadedUrls)
       }
 
-      mctx.setMiddlewareLog('storage-input', {
+      context.setMiddlewareLog('storage-input', {
         backend,
         schemeName: schemeName || 'default',
-        total: mctx.files.length,
+        total: context.files.length,
         uploaded: uploadLogs.filter(l => l.url).length,
         failed: uploadLogs.filter(l => l.error).length,
         urls: uploadedUrls,
@@ -186,9 +186,9 @@ export function createStorageMiddleware(): MiddlewareDefinition {
     configGroup: 'cache',  // 关联到 plugin:cache 配置
     phase: 'lifecycle-post-request',
 
-    async execute(mctx: MiddlewareContext, next): Promise<MiddlewareRunStatus> {
+    async execute(context: MiddlewareContext, next): Promise<MiddlewareRunStatus> {
       // 获取缓存服务
-      const cacheService = mctx.getService<CacheService>('cache')
+      const cacheService = context.getService<CacheService>('cache')
       if (!cacheService) {
         return next()
       }
@@ -199,20 +199,20 @@ export function createStorageMiddleware(): MiddlewareDefinition {
       }
 
       // 没有输出时跳过
-      if (!mctx.output || mctx.output.length === 0) {
+      if (!context.output || context.output.length === 0) {
         return next()
       }
 
       // 获取中间件配置的存储方案
-      const middlewareConfig = await mctx.getMiddlewareConfig<StorageMiddlewareConfig>('storage')
+      const middlewareConfig = await context.getMiddlewareConfig<StorageMiddlewareConfig>('storage')
       const schemeName = middlewareConfig?.schemeName || undefined
       const backend = cacheService.getSchemeBackend(schemeName)
 
       const uploadedAssets: OutputAsset[] = []
       const uploadLogs: Array<{ index: number; originalUrl: string; newUrl?: string; error?: string }> = []
 
-      for (let i = 0; i < mctx.output.length; i++) {
-        const asset = mctx.output[i]
+      for (let i = 0; i < context.output.length; i++) {
+        const asset = context.output[i]
 
         // 跳过文本类型或没有 URL 的资产
         if (asset.kind === 'text' || !asset.url) {
@@ -224,7 +224,7 @@ export function createStorageMiddleware(): MiddlewareDefinition {
           const { buffer, mime } = await downloadAsset(asset.url)
           const filename = `output-${asset.kind}-${i}`
 
-          const result = await uploadToBackend(buffer, filename, mime, mctx, schemeName)
+          const result = await uploadToBackend(buffer, filename, mime, context, schemeName)
 
           const isBase64 = asset.url.startsWith('data:')
           uploadedAssets.push({
@@ -255,12 +255,12 @@ export function createStorageMiddleware(): MiddlewareDefinition {
         }
       }
 
-      mctx.output = uploadedAssets
+      context.output = uploadedAssets
 
-      mctx.setMiddlewareLog('storage', {
+      context.setMiddlewareLog('storage', {
         backend,
         schemeName: schemeName || 'default',
-        total: mctx.output.length,
+        total: context.output.length,
         uploaded: uploadLogs.filter(l => l.newUrl).length,
         failed: uploadLogs.filter(l => l.error).length,
         logs: uploadLogs

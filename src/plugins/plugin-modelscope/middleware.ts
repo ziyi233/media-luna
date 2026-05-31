@@ -191,13 +191,13 @@ export const ModelScopeMiddleware: MiddlewareDefinition = {
   after: ['preset'],
   configGroup: 'modelscope',
 
-  async execute(mctx: MiddlewareContext, next): Promise<MiddlewareRunStatus> {
-    const logger = mctx.ctx.logger('media-luna')
+  async execute(context: MiddlewareContext, next): Promise<MiddlewareRunStatus> {
+    const logger = context.ctx.logger('media-luna')
 
-    logger.debug('[ModelScope] prompt=%s', mctx.prompt)
+    logger.debug('[ModelScope] prompt=%s', context.prompt)
 
     // 获取中间件配置
-    const config = await mctx.getMiddlewareConfig<MiddlewareConfig>('modelscope') || {
+    const config = await context.getMiddlewareConfig<MiddlewareConfig>('modelscope') || {
       loraAliases: [],
       normalizeWeights: true,
       enableSizeParsing: true,
@@ -207,7 +207,7 @@ export const ModelScopeMiddleware: MiddlewareDefinition = {
       portraitHeight: 1024
     }
 
-    let currentPrompt = mctx.prompt
+    let currentPrompt = context.prompt
     let parsedSize: { width: number; height: number; source: string } | null = null
 
     // ============ 尺寸解析 ============
@@ -219,9 +219,9 @@ export const ModelScopeMiddleware: MiddlewareDefinition = {
       }
       parsedSize = sizeResult.size
 
-      if (parsedSize && mctx.channel) {
-        mctx.channel.connectorConfig = {
-          ...mctx.channel.connectorConfig,
+      if (parsedSize && context.channel) {
+        context.channel.connectorConfig = {
+          ...context.channel.connectorConfig,
           width: parsedSize.width,
           height: parsedSize.height
         }
@@ -235,10 +235,10 @@ export const ModelScopeMiddleware: MiddlewareDefinition = {
     logger.debug('[ModelScope] Parsed: cleanPrompt=%s, loras=%o', cleanPrompt, loras)
 
     if (loras.length === 0) {
-      mctx.prompt = cleanPrompt
+      context.prompt = cleanPrompt
       // 记录尺寸解析结果
       if (parsedSize) {
-        mctx.setMiddlewareLog('modelscope', {
+        context.setMiddlewareLog('modelscope', {
           sizeDetected: parsedSize
         })
       }
@@ -284,14 +284,14 @@ export const ModelScopeMiddleware: MiddlewareDefinition = {
     }
 
     if (unresolvedAliases.length > 0) {
-      mctx.setMiddlewareLog('modelscope', {
+      context.setMiddlewareLog('modelscope', {
         warning: 'Unresolved LoRA aliases',
         aliases: unresolvedAliases
       })
     }
 
     if (resolvedLoras.length === 0) {
-      mctx.prompt = cleanPrompt
+      context.prompt = cleanPrompt
       return next()
     }
 
@@ -305,11 +305,11 @@ export const ModelScopeMiddleware: MiddlewareDefinition = {
 
     // 注入激发词到 prompt
     const promptWithTriggers = injectTriggerWords(cleanPrompt, finalLoras)
-    mctx.prompt = promptWithTriggers
+    context.prompt = promptWithTriggers
 
-    logger.debug('[ModelScope] Prompt with triggers: %s', mctx.prompt)
+    logger.debug('[ModelScope] Prompt with triggers: %s', context.prompt)
 
-    if (!mctx.channel) {
+    if (!context.channel) {
       return next()
     }
 
@@ -319,17 +319,17 @@ export const ModelScopeMiddleware: MiddlewareDefinition = {
       loraConfig[l.repoId] = l.weight
     }
 
-    mctx.channel.connectorConfig = {
-      ...mctx.channel.connectorConfig,
+    context.channel.connectorConfig = {
+      ...context.channel.connectorConfig,
       loras: finalLoras.length === 1 ? finalLoras[0].repoId : JSON.stringify(loraConfig)
     }
 
     logger.debug('[ModelScope] Modified: prompt=%s, loras=%s',
-      mctx.prompt,
-      mctx.channel.connectorConfig.loras
+      context.prompt,
+      context.channel.connectorConfig.loras
     )
 
-    mctx.setMiddlewareLog('modelscope', {
+    context.setMiddlewareLog('modelscope', {
       sizeDetected: parsedSize || undefined,
       parsedLoras: loras,
       resolvedLoras: finalLoras.map(l => ({

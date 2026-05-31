@@ -14,11 +14,10 @@ export const modelscopePlugin: PluginDefinition = {
   description: 'ModelScope 图像生成连接器，支持 LoRA 别名解析与激发词注入',
   version: '1.0.0',
 
-  // 声明式连接器注册
-  connector: ModelScopeConnector,
-
-  // 声明式中间件注册
-  middlewares: [ModelScopeMiddleware],
+  contributes: {
+    connectors: [ModelScopeConnector],
+    middlewares: [ModelScopeMiddleware]
+  },
 
   // 插件级配置（用于中间件）
   configFields: pluginConfigFields,

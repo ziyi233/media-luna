@@ -9,7 +9,9 @@ export default definePlugin({
   description: '豆包/火山引擎 Seedream 图像生成连接器',
   version: '1.0.0',
 
-  connector: DoubaoConnector,
+  contributes: {
+    connectors: [DoubaoConnector]
+  },
 
   async onLoad(ctx) {
     ctx.logger.info('Doubao connector loaded')

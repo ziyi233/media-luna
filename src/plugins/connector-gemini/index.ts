@@ -10,7 +10,9 @@ export default definePlugin({
   description: 'Google Gemini 3 图像生成连接器',
   version: '1.0.0',
 
-  connector: GeminiConnector,
+  contributes: {
+    connectors: [GeminiConnector]
+  },
 
   async onLoad(ctx) {
     ctx.logger.info('Gemini connector loaded')

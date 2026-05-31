@@ -10,7 +10,9 @@ export default definePlugin({
   description: '微软 Edge 在线语音合成服务，免费使用，支持多语言和多种音色',
   version: '1.0.0',
 
-  connector: EdgeTTSConnector,
+  contributes: {
+    connectors: [EdgeTTSConnector]
+  },
 
   async onLoad(ctx) {
     ctx.logger.info('Edge TTS connector loaded')

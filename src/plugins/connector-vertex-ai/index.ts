@@ -10,7 +10,9 @@ export default definePlugin({
   description: 'Google Vertex AI 图像生成连接器',
   version: '1.0.0',
 
-  connector: VertexAIConnector,
+  contributes: {
+    connectors: [VertexAIConnector]
+  },
 
   async onLoad(ctx) {
     ctx.logger.info('Vertex AI connector loaded')

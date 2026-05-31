@@ -9,7 +9,9 @@ export default definePlugin({
   description: 'Peinture 图像生成连接器（Linux.do 社区开源项目）',
   version: '1.0.0',
 
-  connector: PeintureConnector,
+  contributes: {
+    connectors: [PeintureConnector]
+  },
 
   async onLoad(ctx) {
     ctx.logger.info('Peinture connector loaded')

@@ -9,7 +9,9 @@ export default definePlugin({
   description: '适配通用 Midjourney API Proxy 服务',
   version: '1.0.0',
 
-  connector: MidjourneyConnector,
+  contributes: {
+    connectors: [MidjourneyConnector]
+  },
 
   async onLoad(ctx) {
     ctx.logger.info('Midjourney connector loaded')

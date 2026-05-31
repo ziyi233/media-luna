@@ -10,7 +10,9 @@ export default definePlugin({
   description: 'OpenAI 语音合成服务，支持多种音色和高清模式，兼容 OpenAI API 格式的第三方服务',
   version: '1.0.0',
 
-  connector: OpenAITTSConnector,
+  contributes: {
+    connectors: [OpenAITTSConnector]
+  },
 
   async onLoad(ctx) {
     ctx.logger.info('OpenAI TTS connector loaded')

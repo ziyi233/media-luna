@@ -10,7 +10,9 @@ export default definePlugin({
   description: '微软 Azure 语音合成服务，免费使用，支持多语言和语音风格',
   version: '1.0.0',
 
-  connector: AzureTTSConnector,
+  contributes: {
+    connectors: [AzureTTSConnector]
+  },
 
   async onLoad(ctx) {
     ctx.logger.info('Azure TTS connector loaded')

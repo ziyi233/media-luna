@@ -9,7 +9,9 @@ export default definePlugin({
   description: 'OpenAI Chat Completions 兼容的多媒体提取连接器',
   version: '1.0.0',
 
-  connector: ChatApiConnector,
+  contributes: {
+    connectors: [ChatApiConnector]
+  },
 
   async onLoad(ctx) {
     ctx.logger.info('Chat API connector loaded')

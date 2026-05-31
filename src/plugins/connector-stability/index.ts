@@ -9,7 +9,9 @@ export default definePlugin({
   description: 'Stability AI 官方连接器 (SD3/Core)',
   version: '1.0.0',
 
-  connector: StabilityConnector,
+  contributes: {
+    connectors: [StabilityConnector]
+  },
 
   async onLoad(ctx) {
     ctx.logger.info('Stability AI connector loaded')

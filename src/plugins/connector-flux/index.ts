@@ -9,7 +9,9 @@ export default definePlugin({
   description: 'Flux 图像生成连接器（支持 Replicate API）',
   version: '1.0.0',
 
-  connector: FluxConnector,
+  contributes: {
+    connectors: [FluxConnector]
+  },
 
   async onLoad(ctx) {
     ctx.logger.info('Flux connector loaded')

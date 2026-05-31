@@ -10,7 +10,9 @@ export default definePlugin({
   description: '火山引擎豆包语音合成服务，支持多音色、多情感',
   version: '1.0.0',
 
-  connector: VolcengineTTSConnector,
+  contributes: {
+    connectors: [VolcengineTTSConnector]
+  },
 
   async onLoad(ctx) {
     ctx.logger.info('Volcengine TTS connector loaded')

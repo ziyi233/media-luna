@@ -9,7 +9,9 @@ export default definePlugin({
   description: '适配第三方 Suno AI API 服务',
   version: '1.0.0',
 
-  connector: SunoConnector,
+  contributes: {
+    connectors: [SunoConnector]
+  },
 
   async onLoad(ctx) {
     ctx.logger.info('Suno AI connector loaded')

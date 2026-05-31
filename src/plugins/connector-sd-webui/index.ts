@@ -9,7 +9,9 @@ export default definePlugin({
   description: 'Stable Diffusion WebUI (AUTOMATIC1111) 连接器',
   version: '1.0.0',
 
-  connector: SDWebUIConnector,
+  contributes: {
+    connectors: [SDWebUIConnector]
+  },
 
   async onLoad(ctx) {
     ctx.logger.info('SD WebUI connector loaded')

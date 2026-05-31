@@ -9,7 +9,9 @@ export default definePlugin({
   description: 'DALL-E / OpenAI 图像生成连接器',
   version: '1.0.0',
 
-  connector: DalleConnector,
+  contributes: {
+    connectors: [DalleConnector]
+  },
 
   async onLoad(ctx) {
     ctx.logger.info('DALL-E connector loaded')

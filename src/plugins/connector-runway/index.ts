@@ -9,7 +9,9 @@ export default definePlugin({
   description: '适配 Runway Gen-2/Gen-3 视频生成',
   version: '1.0.0',
 
-  connector: RunwayConnector,
+  contributes: {
+    connectors: [RunwayConnector]
+  },
 
   async onLoad(ctx) {
     ctx.logger.info('Runway connector loaded')

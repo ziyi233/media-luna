@@ -9,7 +9,9 @@ export default definePlugin({
   description: '适配 ComfyUI 工作流',
   version: '1.0.0',
 
-  connector: ComfyUIConnector,
+  contributes: {
+    connectors: [ComfyUIConnector]
+  },
 
   async onLoad(ctx) {
     ctx.logger.info('ComfyUI connector loaded')

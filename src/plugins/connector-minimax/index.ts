@@ -9,7 +9,9 @@ export default definePlugin({
   description: 'MiniMax 文本转语音连接器，支持多种音色和情感控制',
   version: '1.0.0',
 
-  connector: MiniMaxConnector,
+  contributes: {
+    connectors: [MiniMaxConnector]
+  },
 
   async onLoad(ctx) {
     ctx.logger.info('MiniMax T2A connector loaded')

@@ -6,7 +6,7 @@ import { StructuredTool } from '@langchain/core/tools'
 import { z } from 'zod'
 import { CallbackManagerForToolRun } from '@langchain/core/callbacks/manager'
 import type { ToolConfig, PresetToolConfig } from './config'
-import { formatGenerationResult } from '../koishi-commands/shared/delivery'
+import { formatGenerationResult } from '../koishi-commands/formatters/delivery'
 
 // 存储注册的工具 dispose 函数
 const toolDisposers: (() => void)[] = []

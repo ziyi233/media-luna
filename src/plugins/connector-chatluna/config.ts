@@ -8,7 +8,7 @@ import { promptEnhanceConfigFields, defaultPromptEnhanceConfig, type ChatLunaPro
 /**
  * 返回模式
  * - sync: 等待生成完全完成后返回
- * - async: prepare 阶段完成后返回（已创建任务、预扣费完成），后台继续生成
+ * - async: request 前阶段完成后返回（已创建任务、预扣费完成，并已应用 pre-request 中间件），后台继续生成
  */
 export type ReturnMode = 'sync' | 'async'
 
@@ -20,7 +20,7 @@ export interface ToolConfig {
   description: string
   /** 是否启用 */
   enabled: boolean
-  /** 返回模式：sync=等待生成完成，async=prepare完成后返回（后台生成） */
+  /** 返回模式：sync=等待生成完成，async=request 前阶段完成后返回（后台生成） */
   returnMode: ReturnMode
   /** 内置渠道名（如果设置，AI 无法选择渠道） */
   builtinChannel?: string

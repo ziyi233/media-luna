@@ -14,19 +14,31 @@ const STORE_KEY = 'billing:charged'
 const STORE_AMOUNT_KEY = 'billing:amount'
 const STORE_USER_KEY = 'billing:userId'
 const STORE_CURRENCY_KEY = 'billing:currencyValue'
+const STORE_BASE_COST_KEY = 'billing:baseCost'
+const STORE_SECONDS_KEY = 'billing:seconds'
+
+export const BILLING_DURATION_SECONDS_KEY = 'billing:durationSeconds'
 
 /**
  * 渲染消息模板
- * 支持变量: {cost}, {balance}, {label}, {error}
+ * 支持变量: {cost}, {baseCost}, {seconds}, {balance}, {label}, {error}
  */
 function renderTemplate(
   template: string,
-  vars: { cost?: number; balance?: number | null; label?: string; error?: string }
+  vars: { cost?: number; baseCost?: number; seconds?: number; billingDetail?: string; balance?: number | null; label?: string; error?: string }
 ): string {
   let result = template
+  const shouldAutoInsertBillingDetail = Boolean(vars.billingDetail) && !template.includes('{billingDetail}')
   if (vars.cost !== undefined) {
     result = result.replace(/\{cost\}/g, String(vars.cost))
   }
+  if (vars.baseCost !== undefined) {
+    result = result.replace(/\{baseCost\}/g, String(vars.baseCost))
+  }
+  if (vars.seconds !== undefined) {
+    result = result.replace(/\{seconds\}/g, String(vars.seconds))
+  }
+  result = result.replace(/\{billingDetail\}/g, vars.billingDetail || '')
   if (vars.balance !== undefined && vars.balance !== null) {
     result = result.replace(/\{balance\}/g, String(vars.balance))
   } else {
@@ -39,7 +51,15 @@ function renderTemplate(
   if (vars.error !== undefined) {
     result = result.replace(/\{error\}/g, vars.error)
   }
-  return result
+  if (shouldAutoInsertBillingDetail && vars.cost !== undefined && vars.label) {
+    result = result.replace(`${vars.cost} ${vars.label}`, `${vars.cost} ${vars.label}${vars.billingDetail}`)
+  }
+  return result.replace(/\{(?:baseCost|seconds|billingDetail)\}/g, '')
+}
+
+function formatBillingDetail(baseCost: number | undefined, seconds: number | undefined, label: string): string {
+  if (baseCost === undefined || seconds === undefined) return ''
+  return `（${seconds}s × ${baseCost}${label}/s）`
 }
 
 /**
@@ -52,6 +72,24 @@ function getMessageTemplate(config: BillingConfig | null, key: keyof BillingConf
   }
   // 回退到默认值
   return (defaultBillingConfig as any)[key] || ''
+}
+
+function resolveBillingAmount(config: BillingConfig | null, mctx: MiddlewareContext): { cost: number; baseCost: number; seconds?: number } {
+  const baseCost = config?.cost ?? 0
+  if (config?.billingUnit !== 'second') {
+    return { cost: baseCost, baseCost }
+  }
+
+  const seconds = Number(mctx.store.get(BILLING_DURATION_SECONDS_KEY))
+  if (!Number.isFinite(seconds) || seconds <= 0) {
+    return { cost: baseCost, baseCost }
+  }
+
+  return {
+    cost: Number((baseCost * seconds).toFixed(4)),
+    baseCost,
+    seconds
+  }
 }
 
 /** 获取用户 ID（通过 Koishi binding 表查询） */
@@ -168,11 +206,12 @@ export function createBillingPrepareMiddleware(): MiddlewareDefinition {
         currencyField: config?.currencyField,
         currencyValue: config?.currencyValue,
         currencyLabel: config?.currencyLabel,
+        billingUnit: config?.billingUnit,
         cost: config?.cost
       })
 
       // 获取费用（已由 getMiddlewareConfig 合并渠道覆盖）
-      const cost = config?.cost ?? 0
+      const { cost, baseCost, seconds } = resolveBillingAmount(config, mctx)
 
       // cost = 0 表示免费渠道，跳过计费检查
       if (cost <= 0) {
@@ -206,6 +245,7 @@ export function createBillingPrepareMiddleware(): MiddlewareDefinition {
       // 获取货币类型（已由 getMiddlewareConfig 合并渠道覆盖）
       const currencyValue = config.currencyValue ?? 'default'
       const currencyLabel = config.currencyLabel || '积分'
+      const billingDetail = formatBillingDetail(baseCost, seconds, currencyLabel)
 
       try {
         // 查询余额
@@ -216,13 +256,15 @@ export function createBillingPrepareMiddleware(): MiddlewareDefinition {
           // 使用配置的余额不足提示模板
           const insufficientMsg = renderTemplate(
             getMessageTemplate(config, 'msgInsufficientBalance'),
-            { cost, balance, label: currencyLabel }
+            { cost, baseCost, seconds, billingDetail, balance, label: currencyLabel }
           )
           mctx.setMiddlewareLog('billing-prepare', {
             error: true,
             reason: 'insufficient balance',
             balance,
             required: cost,
+            baseCost,
+            seconds,
             currency: currencyValue
           })
           throw new Error(insufficientMsg)
@@ -234,6 +276,8 @@ export function createBillingPrepareMiddleware(): MiddlewareDefinition {
         // 记录扣费信息到 store，供 finalize 阶段使用
         mctx.store.set(STORE_KEY, true)
         mctx.store.set(STORE_AMOUNT_KEY, cost)
+        mctx.store.set(STORE_BASE_COST_KEY, baseCost)
+        if (seconds !== undefined) mctx.store.set(STORE_SECONDS_KEY, seconds)
         mctx.store.set(STORE_USER_KEY, userId)
         mctx.store.set(STORE_CURRENCY_KEY, currencyValue)
 
@@ -241,12 +285,15 @@ export function createBillingPrepareMiddleware(): MiddlewareDefinition {
         const newBalance = balance - cost
         const preChargeMsg = renderTemplate(
           getMessageTemplate(config, 'msgPreCharge'),
-          { cost, balance: newBalance, label: currencyLabel }
+          { cost, baseCost, seconds, billingDetail, balance: newBalance, label: currencyLabel }
         )
         mctx.addUserHint(preChargeMsg, 'before')
 
         mctx.setMiddlewareLog('billing-prepare', {
           charged: cost,
+          baseCost,
+          seconds,
+          billingUnit: config.billingUnit || 'request',
           userId,
           currency: currencyValue,
           balanceBefore: balance,
@@ -289,6 +336,9 @@ export function createBillingFinalizeMiddleware(): MiddlewareDefinition {
       }
 
       const chargedAmount = mctx.store.get(STORE_AMOUNT_KEY) as number
+      const baseCost = mctx.store.get(STORE_BASE_COST_KEY) as number | undefined
+      const seconds = mctx.store.get(STORE_SECONDS_KEY) as number | undefined
+      const billingDetail = formatBillingDetail(baseCost, seconds, currencyLabel)
       const storedUserId = mctx.store.get(STORE_USER_KEY) as number
       const currencyValue = mctx.store.get(STORE_CURRENCY_KEY) as string
 
@@ -308,12 +358,14 @@ export function createBillingFinalizeMiddleware(): MiddlewareDefinition {
         // 使用配置的成功提示模板
         const successMsg = renderTemplate(
           getMessageTemplate(config, 'msgSuccess'),
-          { cost: chargedAmount, balance: currentBalance, label: currencyLabel }
+          { cost: chargedAmount, baseCost, seconds, billingDetail, balance: currentBalance, label: currencyLabel }
         )
         mctx.addUserHint(successMsg, 'after')
 
         mctx.setMiddlewareLog('billing-finalize', {
           confirmed: chargedAmount,
+          baseCost,
+          seconds,
           userId: storedUserId,
           currency: currencyValue,
           currentBalance
@@ -334,12 +386,14 @@ export function createBillingFinalizeMiddleware(): MiddlewareDefinition {
           // 使用配置的退款提示模板
           const refundedMsg = renderTemplate(
             getMessageTemplate(config, 'msgRefunded'),
-            { cost: chargedAmount, balance: currentBalance, label: currencyLabel }
+            { cost: chargedAmount, baseCost, seconds, billingDetail, balance: currentBalance, label: currencyLabel }
           )
           mctx.addUserHint(refundedMsg, 'after')
 
           mctx.setMiddlewareLog('billing-finalize', {
             refunded: chargedAmount,
+            baseCost,
+            seconds,
             reason: 'generation failed',
             userId: storedUserId,
             currency: currencyValue,
@@ -363,7 +417,7 @@ export function createBillingFinalizeMiddleware(): MiddlewareDefinition {
         // 生成失败但未启用退款 - 使用配置的不退款提示模板
         const noRefundMsg = renderTemplate(
           getMessageTemplate(config, 'msgNoRefund'),
-          { cost: chargedAmount, label: currencyLabel }
+          { cost: chargedAmount, baseCost, seconds, billingDetail, label: currencyLabel }
         )
         mctx.addUserHint(noRefundMsg, 'after')
 
@@ -371,6 +425,8 @@ export function createBillingFinalizeMiddleware(): MiddlewareDefinition {
           noRefund: true,
           reason: 'refundOnFail disabled',
           charged: chargedAmount,
+          baseCost,
+          seconds,
           userId: storedUserId,
           currency: currencyValue
         })

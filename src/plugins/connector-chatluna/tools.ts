@@ -294,7 +294,7 @@ class MediaLunaGenerateTool extends StructuredTool {
       }
 
       // 根据返回模式决定执行方式
-      // async: 等待 prepare 阶段完成后返回，后台继续生成
+      // async: 等待 request 前阶段完成后返回，后台继续生成
       // sync: 等待生成完全完成后返回
       if (this.toolConfig.returnMode === 'async') {
         return await this.generateAsync(
@@ -437,7 +437,7 @@ class MediaLunaGenerateTool extends StructuredTool {
   }
 
   /**
-   * 异步模式：等待 prepare 阶段完成后返回，后台继续生成
+   * 异步模式：等待 request 前阶段完成后返回，后台继续生成
    * 生成完成后通过 session.send 发送结果
    */
   private async generateAsync(
@@ -451,13 +451,13 @@ class MediaLunaGenerateTool extends StructuredTool {
     const channel = await mediaLuna.channels?.getByName?.(channelName)
     const submitAt = new Date()
 
-    // 用于在 prepare 完成时 resolve 的 Promise
+    // 用于在 request 前阶段完成时 resolve 的 Promise
     let resolvePrepare: (info: { hints: string[] }) => void
     const preparePromise = new Promise<{ hints: string[] }>((resolve) => {
       resolvePrepare = resolve
     })
 
-    // 标记 prepare 回调是否已被调用
+    // 标记 request 前回调是否已被调用
     let prepareCallbackCalled = false
 
     // 启动生成（后台执行）
@@ -468,7 +468,7 @@ class MediaLunaGenerateTool extends StructuredTool {
       presetName,
       session,
       uid: (session?.user as any)?.id,
-      // prepare 阶段完成时调用（只有成功通过 prepare 阶段才会调用）
+      // request 前调用（prepare/pre-request 阶段成功通过后调用）
       onPrepareComplete: async (beforeHints: string[]) => {
         prepareCallbackCalled = true
         resolvePrepare!({ hints: beforeHints })
@@ -485,11 +485,11 @@ class MediaLunaGenerateTool extends StructuredTool {
     // 将 generationPromise 也转换为可以 race 的 Promise
     // 如果生成快速完成（成功或失败），也要处理
     const generationRacePromise = generationPromise.then((result: any) => {
-      // 如果 prepare 回调已调用，说明已经进入生成阶段，不需要处理
+      // 如果 request 前回调已调用，说明已经进入生成阶段，不需要处理
       if (prepareCallbackCalled) {
         return null // 返回 null 表示不需要在 race 中处理
       }
-      // prepare 回调未被调用但生成已完成，说明 prepare 阶段就失败了
+      // request 前回调未被调用但生成已完成，说明 request 前阶段就失败了
       if (!result.success) {
         return { type: 'failed' as const, error: result.error || '生成失败' }
       }
@@ -521,11 +521,11 @@ class MediaLunaGenerateTool extends StructuredTool {
       // 这种情况理论上不会发生，因为 prepareRacePromise 会先 resolve
       // 但为了安全，返回任务已启动
     } else if (raceResult.type === 'failed') {
-      // prepare 阶段失败（如余额不足）
+      // request 前阶段失败（如余额不足）
       return `[TASK FAILED] ${raceResult.error}`
     } else if (raceResult.type === 'timeout') {
       // 超时
-      return `[TASK FAILED] 准备阶段超时`
+      return `[TASK FAILED] 请求前阶段超时`
     } else if (raceResult.type === 'success') {
       // 罕见：没有 prepare 回调但生成成功了
       // 这种情况下不需要后台处理，直接返回结果
@@ -543,7 +543,7 @@ class MediaLunaGenerateTool extends StructuredTool {
       })
     }
 
-    // type === 'prepared'，prepare 阶段成功完成
+    // type === 'prepared'，request 前阶段成功完成
     const prepareInfo = raceResult as { type: 'prepared'; hints: string[] }
 
     const taskId = await taskIdPromise

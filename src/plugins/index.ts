@@ -12,8 +12,13 @@ import webuiAuthPlugin from './webui-auth'
 import koishiCommandsPlugin from './koishi-commands'
 import vitsPlugin from './vits'
 import dalleSizeEnhancerPlugin from './dalle-size-enhancer'
+import videoDurationEnhancerPlugin from './video-duration-enhancer'
 
 // 连接器插件
+import agnesImageConnectorPlugin from './connector-agnes-image'
+import agnesVideoConnectorPlugin from './connector-agnes-video'
+import openAIVideoConnectorPlugin from './connector-openai-video'
+import newAPIVideoConnectorPlugin from './connector-newapi-video'
 import dalleConnectorPlugin from './connector-dalle'
 import sdWebuiConnectorPlugin from './connector-sd-webui'
 import fluxConnectorPlugin from './connector-flux'
@@ -48,7 +53,12 @@ export const builtinPlugins: PluginDefinition[] = [
   koishiCommandsPlugin,
   vitsPlugin,
   dalleSizeEnhancerPlugin,
+  videoDurationEnhancerPlugin,
   // 连接器插件
+  agnesImageConnectorPlugin,
+  agnesVideoConnectorPlugin,
+  openAIVideoConnectorPlugin,
+  newAPIVideoConnectorPlugin,
   dalleConnectorPlugin,
   sdWebuiConnectorPlugin,
   fluxConnectorPlugin,
@@ -83,6 +93,11 @@ export {
   koishiCommandsPlugin,
   vitsPlugin,
   dalleSizeEnhancerPlugin,
+  videoDurationEnhancerPlugin,
+  agnesImageConnectorPlugin,
+  agnesVideoConnectorPlugin,
+  openAIVideoConnectorPlugin,
+  newAPIVideoConnectorPlugin,
   dalleConnectorPlugin,
   sdWebuiConnectorPlugin,
   fluxConnectorPlugin,
@@ -116,6 +131,7 @@ export type { WebuiAuthConfig } from './webui-auth'
 export type { KoishiCommandsConfig } from './koishi-commands'
 export type { VitsPluginConfig, VitsSpeaker, VitsSayOptions } from './vits'
 export type { DalleSizeEnhancerConfig } from './dalle-size-enhancer'
+export type { VideoDurationEnhancerConfig } from './video-duration-enhancer'
 export type { ChatLunaPluginConfig, ToolConfig, PresetToolConfig } from './connector-chatluna/config'
 export type { ChatLunaPromptEnhanceConfig } from './connector-chatluna/middleware'
 export type { MiddlewareConfig as ModelScopeMiddlewareConfig, LoraAlias as ModelScopeLoraAlias } from './plugin-modelscope/config'
@@ -130,4 +146,5 @@ export { MediaLunaVits, getChannelSpeakerIdBase, getSpeakerIdFromChannelId, getC
 // 导出中间件工厂
 export { createCensorBypassMiddleware } from './prompt-censor-bypass'
 export { createDalleSizeEnhancerMiddleware } from './dalle-size-enhancer'
+export { createVideoDurationEnhancerMiddleware } from './video-duration-enhancer'
 export { createChatLunaPromptEnhanceMiddleware } from './connector-chatluna/middleware'

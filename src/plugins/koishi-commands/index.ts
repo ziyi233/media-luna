@@ -1,6 +1,5 @@
 // Koishi 聊天指令插件入口
 // 注册渠道名指令，支持收集模式
-import { } from 'koishi-plugin-adapter-onebot'
 import { definePlugin } from '../../core'
 import type { PluginContext } from '../../core/types'
 import {

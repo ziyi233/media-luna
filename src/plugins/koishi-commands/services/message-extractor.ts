@@ -122,16 +122,17 @@ export class MessageExtractor {
           const fileId = el.attrs?.file || el.attrs?.file_id
           const isLocalPath = !targetUrl || !targetUrl.startsWith('http')
 
-          if (isLocalPath && fileId && session.onebot?._request) {
+          const onebot = (session as any).onebot
+          if (isLocalPath && fileId && onebot?._request) {
             try {
               this.logger.info(`Attempting to fetch real URL for video fileId: ${fileId} using NapCat API`)
-              const { data } = await session.onebot._request('get_file', { file: fileId })
+              const { data } = await onebot._request('get_file', { file: fileId })
               if (data && data.url && (data.url.startsWith('http://') || data.url.startsWith('https://'))) {
                 this.logger.info(`Successfully retrieved NapCat video URL: ${data.url}`)
                 targetUrl = data.url
               } else {
                 this.logger.warn(`NapCat API returned no URL for fileId: ${fileId}. Trying to use get_group_file_url.`)
-                const { data } = await session.onebot._request('get_group_file_url', { file: fileId, group_id: session.guildId })
+                const { data } = await onebot._request('get_group_file_url', { file: fileId, group_id: session.guildId })
                 if (data && data.url && (data.url.startsWith('http://') || data.url.startsWith('https://'))) {
                   this.logger.info(`Successfully retrieved NapCat video URL: ${data.url}`)
                   targetUrl = data.url

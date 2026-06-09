@@ -371,6 +371,14 @@ export function createRequestMiddleware(requestService: RequestService) {
         ? channel.connectorConfig.timeout * 1000
         : undefined
 
+      const inputFileUrls = context.store.get('inputFileUrls')
+      if (Array.isArray(inputFileUrls) && inputFileUrls.length > 0) {
+        context.parameters = {
+          ...context.parameters,
+          inputFileUrls
+        }
+      }
+
       const result = await requestService.execute(
         channel.connectorId,
         channel.connectorConfig,

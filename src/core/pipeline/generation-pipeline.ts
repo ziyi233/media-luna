@@ -104,35 +104,27 @@ export class GenerationPipeline {
       this._logger.info(`Executing ${levels.length} middleware levels`)
 
       // 逐层执行中间件
-      let preparePhaseCompleted = false
+      let preRequestPhaseCompleted = false
       for (const level of levels) {
         // 跳过 lifecycle-finalize 阶段，稍后单独执行
         const isFinalize = level.every(m => m.phase === 'lifecycle-finalize')
         if (isFinalize) continue
 
-        // 检测当前层是否为 lifecycle-prepare 阶段
-        const isPreparePhase = level.some(m => m.phase === 'lifecycle-prepare')
+        // request 阶段开始前，prepare/pre-request 中间件都已经完成。
+        if (this._shouldNotifyBeforeRequest(level, preRequestPhaseCompleted)) {
+          preRequestPhaseCompleted = true
+          await this._callPrepareCompleteCallback(request, context)
+        }
 
         // 过滤禁用的中间件
         const enabledMiddlewares = await this._getEnabledMiddlewares(level, context.channel)
 
         if (enabledMiddlewares.length === 0) {
-          // 即使 prepare 阶段没有启用的中间件，也视为成功通过 prepare
-          if (this._shouldNotifyPrepareComplete(isPreparePhase, preparePhaseCompleted, null)) {
-            preparePhaseCompleted = true
-            await this._callPrepareCompleteCallback(request, context)
-          }
           continue
         }
 
         const results = await this._executeLevel(enabledMiddlewares, context)
         const levelOutcome = this._analyzeLevelResults(results, context)
-
-        // 只有 prepare 阶段成功通过后，才通知调用者进入后续生成流程
-        if (this._shouldNotifyPrepareComplete(isPreparePhase, preparePhaseCompleted, levelOutcome)) {
-          preparePhaseCompleted = true
-          await this._callPrepareCompleteCallback(request, context)
-        }
 
         earlyStopByMiddleware = levelOutcome.stopped
         pipelineError = levelOutcome.error
@@ -397,14 +389,12 @@ export class GenerationPipeline {
     }
   }
 
-  private _shouldNotifyPrepareComplete(
-    isPreparePhase: boolean,
-    preparePhaseCompleted: boolean,
-    levelOutcome: LevelOutcome | null
+  private _shouldNotifyBeforeRequest(
+    level: MiddlewareDefinition[],
+    preRequestPhaseCompleted: boolean
   ): boolean {
-    if (!isPreparePhase || preparePhaseCompleted) return false
-    if (!levelOutcome) return true
-    return !levelOutcome.stopped && !levelOutcome.error
+    if (preRequestPhaseCompleted) return false
+    return level.some(middleware => middleware.phase === 'lifecycle-request')
   }
 
   /**
@@ -430,8 +420,8 @@ export class GenerationPipeline {
   }
 
   /**
-   * 调用 prepare 阶段完成回调
-   * 将 before hints 传递给调用者，让其决定如何显示
+   * 调用 request 前回调
+   * 将 prepare/pre-request 阶段收集到的 before hints 传递给调用者，让其决定如何显示
    */
   private async _callPrepareCompleteCallback(
     request: GenerationRequest,

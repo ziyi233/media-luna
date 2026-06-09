@@ -13,6 +13,7 @@ export interface BillingConfig {
   // 计费行为配置
   refundOnFail: boolean
   currencyLabel: string
+  billingUnit: 'request' | 'second'
 
   // 渠道级配置（可在渠道中覆盖）
   cost: number
@@ -77,14 +78,25 @@ export const billingConfigFields: ConfigField[] = [
     default: true,
     description: '生成失败时自动退还已扣费用'
   },
+  {
+    key: 'billingUnit',
+    label: '计费单位',
+    type: 'select',
+    default: 'request',
+    options: [
+      { label: '按次', value: 'request' },
+      { label: '按秒', value: 'second' }
+    ],
+    description: '按秒计费时，费用 = 单价 × 视频时长；视频时长由 video-duration-enhancer 写入'
+  },
 
   // 渠道级配置（可在渠道配置中覆盖）
   {
     key: 'cost',
-    label: '单次费用',
+    label: '费用',
     type: 'number',
     default: 0,
-    description: '每次生成消耗的费用（0 表示免费）'
+    description: '按次计费时为每次费用；按秒计费时为每秒单价（0 表示免费）'
   },
   {
     key: 'currencyValue',
@@ -100,33 +112,33 @@ export const billingConfigFields: ConfigField[] = [
     key: 'msgPreCharge',
     label: '预扣费提示',
     type: 'text',
-    default: '已预扣 {cost} {label}，余额 {balance} {label}',
-    placeholder: '已预扣 {cost} {label}，余额 {balance} {label}',
-    description: '预扣费成功时的提示。变量: {cost}费用, {balance}余额, {label}货币名称'
+    default: '已预扣 {cost} {label}{billingDetail}，余额 {balance} {label}',
+    placeholder: '已预扣 {cost} {label}{billingDetail}，余额 {balance} {label}',
+    description: '预扣费成功时的提示。变量: {cost}费用, {baseCost}单价, {seconds}秒数, {billingDetail}计费详情, {balance}余额, {label}货币名称'
   },
   {
     key: 'msgInsufficientBalance',
     label: '余额不足提示',
     type: 'text',
-    default: '余额不足：需要 {cost} {label}，当前余额 {balance} {label}',
-    placeholder: '余额不足：需要 {cost} {label}，当前余额 {balance} {label}',
-    description: '余额不足时的提示。变量: {cost}费用, {balance}余额, {label}货币名称'
+    default: '余额不足：需要 {cost} {label}{billingDetail}，当前余额 {balance} {label}',
+    placeholder: '余额不足：需要 {cost} {label}{billingDetail}，当前余额 {balance} {label}',
+    description: '余额不足时的提示。变量: {cost}费用, {baseCost}单价, {seconds}秒数, {billingDetail}计费详情, {balance}余额, {label}货币名称'
   },
   {
     key: 'msgSuccess',
     label: '成功提示',
     type: 'text',
-    default: '生成成功，消费 {cost} {label}，余额 {balance} {label}',
-    placeholder: '生成成功，消费 {cost} {label}，余额 {balance} {label}',
-    description: '生成成功时的提示。变量: {cost}费用, {balance}余额, {label}货币名称'
+    default: '生成成功，消费 {cost} {label}{billingDetail}，余额 {balance} {label}',
+    placeholder: '生成成功，消费 {cost} {label}{billingDetail}，余额 {balance} {label}',
+    description: '生成成功时的提示。变量: {cost}费用, {baseCost}单价, {seconds}秒数, {billingDetail}计费详情, {balance}余额, {label}货币名称'
   },
   {
     key: 'msgRefunded',
     label: '退款提示',
     type: 'text',
-    default: '生成失败，已退还 {cost} {label}，余额 {balance} {label}',
-    placeholder: '生成失败，已退还 {cost} {label}，余额 {balance} {label}',
-    description: '生成失败退款时的提示。变量: {cost}费用, {balance}余额, {label}货币名称'
+    default: '生成失败，已退还 {cost} {label}{billingDetail}，余额 {balance} {label}',
+    placeholder: '生成失败，已退还 {cost} {label}{billingDetail}，余额 {balance} {label}',
+    description: '生成失败退款时的提示。变量: {cost}费用, {baseCost}单价, {seconds}秒数, {billingDetail}计费详情, {balance}余额, {label}货币名称'
   },
   {
     key: 'msgRefundFailed',
@@ -140,14 +152,21 @@ export const billingConfigFields: ConfigField[] = [
     key: 'msgNoRefund',
     label: '不退款提示',
     type: 'text',
-    default: '生成失败，已扣费 {cost} {label}（不退款）',
-    placeholder: '生成失败，已扣费 {cost} {label}（不退款）',
-    description: '生成失败但不退款时的提示。变量: {cost}费用, {label}货币名称'
+    default: '生成失败，已扣费 {cost} {label}{billingDetail}（不退款）',
+    placeholder: '生成失败，已扣费 {cost} {label}{billingDetail}（不退款）',
+    description: '生成失败但不退款时的提示。变量: {cost}费用, {baseCost}单价, {seconds}秒数, {billingDetail}计费详情, {label}货币名称'
   }
 ]
 
 /** 计费卡片展示字段 */
 export const billingCardFields: CardField[] = [
+  {
+    source: 'pluginOverride',
+    configGroup: 'billing',
+    key: 'billingUnit',
+    label: '计费单位',
+    format: 'text'
+  },
   {
     source: 'pluginOverride',
     configGroup: 'billing',
@@ -173,13 +192,14 @@ export const defaultBillingConfig: BillingConfig = {
   currencyField: 'currency',
   refundOnFail: true,
   currencyLabel: '积分',
+  billingUnit: 'request',
   cost: 0,
   currencyValue: 'default',
   // 提示信息模板
-  msgPreCharge: '已预扣 {cost} {label}，余额 {balance} {label}',
-  msgInsufficientBalance: '余额不足：需要 {cost} {label}，当前余额 {balance} {label}',
-  msgSuccess: '生成成功，消费 {cost} {label}，余额 {balance} {label}',
-  msgRefunded: '生成失败，已退还 {cost} {label}，余额 {balance} {label}',
+  msgPreCharge: '已预扣 {cost} {label}{billingDetail}，余额 {balance} {label}',
+  msgInsufficientBalance: '余额不足：需要 {cost} {label}{billingDetail}，当前余额 {balance} {label}',
+  msgSuccess: '生成成功，消费 {cost} {label}{billingDetail}，余额 {balance} {label}',
+  msgRefunded: '生成失败，已退还 {cost} {label}{billingDetail}，余额 {balance} {label}',
   msgRefundFailed: '生成失败，退款失败：{error}',
-  msgNoRefund: '生成失败，已扣费 {cost} {label}（不退款）'
+  msgNoRefund: '生成失败，已扣费 {cost} {label}{billingDetail}（不退款）'
 }

@@ -35,12 +35,12 @@ export const connectorFields: ConnectorField[] = [
     key: 'responseFormat',
     label: '响应格式',
     type: 'select',
-    default: 'b64_json',
+    default: 'url',
     options: [
       { label: 'Base64', value: 'b64_json' },
       { label: 'URL', value: 'url' }
     ],
-    description: 'Agnes Image 输出格式，默认使用 b64_json 直接返回图片数据'
+    description: 'Agnes Image 输出格式，默认使用 url 返回图片结果'
   },
   {
     key: 'enableImageInput',

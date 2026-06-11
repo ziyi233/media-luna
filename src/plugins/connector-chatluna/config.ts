@@ -56,6 +56,8 @@ export interface TaskQueryToolConfig {
 export interface ChatLunaPluginConfig {
   /** 是否启用工具注册 */
   enableTools: boolean
+  /** 是否启用 messageId 任务绑定与状态注入 */
+  enableMessageIdTaskBinding: boolean
   /** 工具列表 */
   tools: ToolConfig[]
   /** 预设查看工具配置 */
@@ -114,6 +116,13 @@ export const chatlunaConfigFields: ConfigField[] = [
     type: 'boolean',
     default: false,
     description: '注册预设变量，可在 ChatLuna 预设中使用 {{medialuna_channels()}}、{{medialuna_presets()}} 等'
+  },
+  {
+    key: 'enableMessageIdTaskBinding',
+    label: '启用 messageId 任务绑定',
+    type: 'boolean',
+    default: false,
+    description: '要求画图工具提交触发消息的 messageId，并将任务状态自动注入到对应消息后面'
   },
   {
     key: 'presetTool.enabled',
@@ -267,6 +276,7 @@ export const defaultToolConfig: ToolConfig = {
 
 export const defaultConfig: ChatLunaPluginConfig = {
   enableTools: false,
+  enableMessageIdTaskBinding: false,
   tools: [defaultToolConfig],
   presetTool: {
     enabled: true,

@@ -5,11 +5,14 @@ import { Context, Session } from 'koishi'
 import { StructuredTool } from '@langchain/core/tools'
 import { z } from 'zod'
 import { CallbackManagerForToolRun } from '@langchain/core/callbacks/manager'
+import type { ChatLunaPlugin } from 'koishi-plugin-chatluna/services/chat'
+import type { ChatLunaToolRunnable } from 'koishi-plugin-chatluna/llm-core/platform/types'
 import type { ToolConfig, PresetToolConfig } from './config'
 import { formatGenerationResult } from '../koishi-commands/formatters/delivery'
+import type { FileData, GenerationResult, OutputAsset } from '../../types'
+import type { TaskData, TaskListItem, TaskService } from '../task/service'
+import { bindChatLunaTask, updateChatLunaTaskBindingStatus } from './task-binding'
 
-// 存储注册的工具 dispose 函数
-const toolDisposers: (() => void)[] = []
 const DEFAULT_QUERY_TOOL_NAME = 'medialuna_query_tasks'
 
 interface QueryToolRuntimeConfig {
@@ -30,27 +33,62 @@ function getQueryToolName() {
   return queryToolRuntimeConfig.name || DEFAULT_QUERY_TOOL_NAME
 }
 
+interface MediaLunaChannelLike {
+  id: number
+  name: string
+  tags?: string[]
+}
+
+interface MediaLunaPresetLike {
+  name: string
+  description?: string
+  tags?: string[]
+  promptTemplate?: string
+  referenceImages?: string[]
+}
+
+interface MediaLunaLike {
+  channels?: {
+    getByName?(name: string): Promise<MediaLunaChannelLike | null>
+  }
+  channelService?: {
+    list(): Promise<Array<{ enabled: boolean; name: string }>>
+  }
+  presets?: {
+    list(arg?: { enabledOnly?: boolean }): Promise<MediaLunaPresetLike[]>
+  }
+  tasks?: TaskService
+  configService?: {
+    get?<T = unknown>(key: string, fallback?: T): T
+  }
+  generateByName(options: {
+    channelName: string
+    presetName?: string
+    prompt: string
+    files?: FileData[]
+    session?: Session
+    uid?: number
+    onPrepareComplete?: (hints: string[]) => Promise<void>
+  }): Promise<GenerationResult>
+}
+
+function getMediaLuna(ctx: Context): MediaLunaLike | undefined {
+  return (ctx as any).mediaLuna as MediaLunaLike | undefined
+}
+
 /**
  * 注册 Media Luna 工具到 ChatLuna
  */
-export function registerChatLunaTools(
+export async function registerChatLunaTools(
   ctx: Context,
+  plugin: ChatLunaPlugin<any, any>,
+  pluginConfig: { enableMessageIdTaskBinding?: boolean },
   tools: ToolConfig[],
   presetToolConfig: PresetToolConfig,
   logger: any
 ) {
-  const chatluna = (ctx as any).chatluna
-
-  if (!chatluna) {
-    logger.warn('ChatLuna service not available, skipping tool registration')
-    return
-  }
-
-  // 清理之前注册的工具
-  unregisterChatLunaTools()
-
-  const pluginConfig = (ctx as any).mediaLuna?.configService?.get?.('plugin:connector-chatluna', {}) as any
-  const queryConfig = pluginConfig?.taskQueryTool || {}
+  const runtimeConfig = getMediaLuna(ctx)?.configService?.get?.('plugin:connector-chatluna', {}) as Record<string, any>
+  const queryConfig = runtimeConfig?.taskQueryTool || {}
   queryToolRuntimeConfig = {
     name: queryConfig.name || DEFAULT_QUERY_TOOL_NAME,
     defaultWaitMs: typeof queryConfig.defaultWaitMs === 'number' ? queryConfig.defaultWaitMs : 300000,
@@ -61,66 +99,100 @@ export function registerChatLunaTools(
   const enabledTools = tools.filter(t => t.enabled)
 
   for (const toolConfig of enabledTools) {
-    const dispose = chatluna.platform.registerTool(toolConfig.name, {
+    const description = await replaceDescriptionVariables(ctx, buildDescription(toolConfig))
+    plugin.registerTool(toolConfig.name, {
+      description,
       createTool() {
-        return new MediaLunaGenerateTool(ctx, toolConfig, logger)
+        return new MediaLunaGenerateTool(ctx, toolConfig, logger, pluginConfig)
       },
       selector(_history: any) {
         return true
+      },
+      authorization(_session: Session) {
+        return true
+      },
+      meta: {
+        source: 'extension',
+        group: 'plugin-common',
+        tags: ['media-luna', 'image-generation'],
+        defaultAvailability: {
+          enabled: true,
+          main: true,
+          chatluna: true,
+          characterScope: 'all'
+        }
       }
     })
-    toolDisposers.push(dispose)
     logger.info(`Registered ChatLuna tool: ${toolConfig.name}`)
   }
 
   const queryEnabled = queryConfig.enabled !== false
   if (queryEnabled) {
     const queryToolName = getQueryToolName()
-    const queryDispose = chatluna.platform.registerTool(queryToolName, {
+    plugin.registerTool(queryToolName, {
+      description: 'Query Media Luna task status and output URLs by task IDs. Use this after task-mode submit tools.',
       createTool() {
         return new MediaLunaTaskQueryTool(ctx, logger)
       },
       selector(_history: any) {
         return true
+      },
+      authorization(_session: Session) {
+        return true
+      },
+      meta: {
+        source: 'extension',
+        group: 'plugin-common',
+        tags: ['media-luna', 'task', 'query'],
+        defaultAvailability: {
+          enabled: true,
+          main: true,
+          chatluna: true,
+          characterScope: 'all'
+        }
       }
     })
-    toolDisposers.push(queryDispose)
     logger.info(`Registered ChatLuna tool: ${queryToolName}`)
   }
 
   // 注册预设查看工具（如果启用）
   if (presetToolConfig.enabled) {
-    const presetDispose = chatluna.platform.registerTool(presetToolConfig.name, {
+    const description = await replaceDescriptionVariables(ctx, presetToolConfig.description)
+    plugin.registerTool(presetToolConfig.name, {
+      description,
       createTool() {
         return new MediaLunaPresetTool(ctx, presetToolConfig, logger)
       },
       selector(_history: any) {
         return true
+      },
+      authorization(_session: Session) {
+        return true
+      },
+      meta: {
+        source: 'extension',
+        group: 'plugin-common',
+        tags: ['media-luna', 'preset'],
+        defaultAvailability: {
+          enabled: true,
+          main: true,
+          chatluna: true,
+          characterScope: 'all'
+        }
       }
     })
-    toolDisposers.push(presetDispose)
     logger.info(`Registered ChatLuna tool: ${presetToolConfig.name}`)
   }
-}
-
-/**
- * 注销所有已注册的工具
- */
-export function unregisterChatLunaTools() {
-  for (const dispose of toolDisposers) {
-    try {
-      dispose()
-    } catch (e) {
-      // ignore
-    }
-  }
-  toolDisposers.length = 0
 }
 
 /**
  * 动态构建 schema（根据内置值决定暴露哪些参数）
  */
 function buildSchema(toolConfig: ToolConfig) {
+  return buildSchemaWithOptions(toolConfig, { enableMessageIdTaskBinding: false })
+}
+
+function buildSchemaWithOptions(toolConfig: ToolConfig, options: { enableMessageIdTaskBinding?: boolean }) {
   const schemaFields: Record<string, z.ZodTypeAny> = {}
 
   // 渠道参数（如果没有内置值，则暴露给 AI）
@@ -146,6 +218,12 @@ function buildSchema(toolConfig: ToolConfig) {
   schemaFields.urls = z.array(z.string()).optional().describe(
     'Optional array of image URLs to use as reference for generation'
   )
+
+  if (options.enableMessageIdTaskBinding) {
+    schemaFields.messageId = z.string().describe(
+      'The message ID in the current conversation that triggered this generation request.'
+    )
+  }
 
   return z.object(schemaFields)
 }
@@ -186,12 +264,12 @@ async function replaceDescriptionVariables(ctx: Context, description: string): P
   // 替换 {channels}
   if (result.includes('{channels}')) {
     try {
-      const mediaLuna = (ctx as any).mediaLuna
+      const mediaLuna = getMediaLuna(ctx)
       if (mediaLuna?.channelService) {
         const channels = await mediaLuna.channelService.list()
         const enabledChannels = channels
-          .filter((c: any) => c.enabled)
-          .map((c: any) => c.name)
+          .filter((c) => c.enabled)
+          .map((c) => c.name)
         result = result.replace('{channels}', enabledChannels.join(', ') || 'none')
       } else {
         result = result.replace('{channels}', 'none')
@@ -204,10 +282,10 @@ async function replaceDescriptionVariables(ctx: Context, description: string): P
   // 替换 {presets}
   if (result.includes('{presets}')) {
     try {
-      const mediaLuna = (ctx as any).mediaLuna
+      const mediaLuna = getMediaLuna(ctx)
       if (mediaLuna?.presets) {
         const presets = await mediaLuna.presets.list({ enabledOnly: true })
-        const presetNames = presets.map((p: any) => p.name).join(', ')
+        const presetNames = presets.map((p) => p.name).join(', ')
         result = result.replace('{presets}', presetNames || 'none')
       } else {
         result = result.replace('{presets}', 'none')
@@ -232,14 +310,15 @@ class MediaLunaGenerateTool extends StructuredTool {
   constructor(
     private ctx: Context,
     private toolConfig: ToolConfig,
-    private logger: any
+    private logger: any,
+    private pluginConfig: { enableMessageIdTaskBinding?: boolean }
   ) {
     super()
     this.name = toolConfig.name
     this.descriptionTemplate = buildDescription(toolConfig)
     // 初始描述
     this.description = this.descriptionTemplate.replace('{presets}', '(loading...)')
-    this.schema = buildSchema(toolConfig)
+    this.schema = buildSchemaWithOptions(toolConfig, this.pluginConfig)
 
     // 异步更新描述
     this.updateDescription()
@@ -250,14 +329,15 @@ class MediaLunaGenerateTool extends StructuredTool {
   }
 
   async _call(
-    input: { channel?: string; preset?: string; prompt: string; urls?: string[] },
+    input: { channel?: string; preset?: string; prompt: string; urls?: string[]; messageId?: string },
     _runManager?: CallbackManagerForToolRun,
-    config?: any
+    config?: ChatLunaToolRunnable
   ): Promise<string> {
     const session: Session | undefined = config?.configurable?.session
+    const conversationId = config?.configurable?.conversationId
 
     try {
-      const mediaLuna = (this.ctx as any).mediaLuna
+      const mediaLuna = getMediaLuna(this.ctx)
       if (!mediaLuna) {
         return 'Error: MediaLuna service not available'
       }
@@ -270,13 +350,27 @@ class MediaLunaGenerateTool extends StructuredTool {
 
       // 确定预设名
       const presetName = this.toolConfig.builtinPreset || input.preset
+      const messageId = input.messageId?.trim()
+
+      if (this.pluginConfig.enableMessageIdTaskBinding && !messageId) {
+        this.logger.warn('[MediaLunaTool] messageId binding enabled but tool call missing messageId')
+        return 'Error: messageId is required when messageId task binding is enabled'
+      }
+
+      if (this.pluginConfig.enableMessageIdTaskBinding && !conversationId) {
+        this.logger.warn('[MediaLunaTool] messageId binding enabled but no conversationId in run config')
+        return 'Error: conversationId is required for messageId task binding'
+      }
 
       this.logger.info(`[MediaLunaTool] Channel: ${channelName}, Preset: ${presetName || 'none'}`)
       this.logger.info(`[MediaLunaTool] Prompt: ${input.prompt}`)
       this.logger.info(`[MediaLunaTool] URLs: ${input.urls?.length || 0}`)
+      if (messageId) {
+        this.logger.info(`[MediaLunaTool] MessageId: ${messageId}`)
+      }
 
       // 下载参考图片
-      const files: any[] = []
+      const files: FileData[] = []
       if (input.urls && input.urls.length > 0) {
         for (const url of input.urls) {
           try {
@@ -298,12 +392,12 @@ class MediaLunaGenerateTool extends StructuredTool {
       // sync: 等待生成完全完成后返回
       if (this.toolConfig.returnMode === 'async') {
         return await this.generateAsync(
-          mediaLuna, channelName, presetName, input.prompt, files, session
+          mediaLuna, channelName, presetName, input.prompt, files, session, conversationId, messageId
         )
       }
 
       // sync: 等待生成完成
-      return await this.generateSync(mediaLuna, channelName, presetName, input.prompt, files, session)
+      return await this.generateSync(mediaLuna, channelName, presetName, input.prompt, files, session, conversationId, messageId)
 
     } catch (e) {
       this.logger.error(`[MediaLunaTool] Error:`, e)
@@ -316,12 +410,14 @@ class MediaLunaGenerateTool extends StructuredTool {
    * 直接返回图片 URL，不通过 session.send 发送，由 AI 决定如何展示
    */
   private async generateSync(
-    mediaLuna: any,
+    mediaLuna: MediaLunaLike,
     channelName: string,
     presetName: string | undefined,
     prompt: string,
-    files: any[],
-    session: Session | undefined
+    files: FileData[],
+    session: Session | undefined,
+    conversationId?: string,
+    messageId?: string
   ): Promise<string> {
     const channel = await mediaLuna.channels?.getByName?.(channelName)
     const submitAt = new Date()
@@ -333,7 +429,7 @@ class MediaLunaGenerateTool extends StructuredTool {
 
     let prepareCallbackCalled = false
 
-    const generationPromise = mediaLuna.generateByName({
+    const generationPromise: Promise<GenerationResult> = mediaLuna.generateByName({
       channelName,
       prompt,
       files,
@@ -346,11 +442,11 @@ class MediaLunaGenerateTool extends StructuredTool {
       }
     })
 
-    generationPromise.catch((e: any) => {
-      this.logger.error('[MediaLunaTool] generateSync background error:', e)
-    })
+      generationPromise.catch((e: unknown) => {
+        this.logger.error('[MediaLunaTool] generateSync background error:', e)
+      })
 
-    const generationRacePromise = generationPromise.then((result: any) => {
+    const generationRacePromise = generationPromise.then((result) => {
       if (prepareCallbackCalled) return null
       if (!result.success) {
         return { type: 'failed' as const, error: result.error || '生成失败' }
@@ -388,6 +484,7 @@ class MediaLunaGenerateTool extends StructuredTool {
         ok: true,
         mode: 'manual',
         tasks: [{ index: 1, taskId: result.taskId }],
+        messageId,
         message: `Task finished quickly. Query with ${getQueryToolName()} if needed.`
       })
     }
@@ -399,12 +496,24 @@ class MediaLunaGenerateTool extends StructuredTool {
       submitAt
     })
 
+    if (conversationId && messageId && taskId) {
+      bindChatLunaTask({
+        conversationId,
+        messageId,
+        taskId,
+        status: 'processing',
+        channelName
+      })
+      this.logger.info('[MediaLunaTool] Bound task #%s to conversation=%s messageId=%s', taskId, conversationId, messageId)
+    }
+
     const hints = (raceResult as any)?.hints as string[] | undefined
 
     return JSON.stringify({
       ok: true,
       mode: 'manual',
       tasks: taskId ? [{ index: 1, taskId }] : [],
+      messageId,
       info: hints || [],
       message: taskId
         ? `Task submitted. MUST call ${getQueryToolName()} with this taskId to wait for final result URLs (default wait: 5 minutes).`
@@ -413,7 +522,7 @@ class MediaLunaGenerateTool extends StructuredTool {
   }
 
   private async resolveTaskId(
-    mediaLuna: any,
+    mediaLuna: MediaLunaLike,
     options: { uid?: number; channelId?: number; prompt: string; submitAt: Date }
   ): Promise<number | null> {
     const taskService = mediaLuna?.tasks
@@ -422,7 +531,7 @@ class MediaLunaGenerateTool extends StructuredTool {
     const deadline = Date.now() + 5000
     while (Date.now() < deadline) {
       const tasks = await taskService.query({ uid: options.uid, channelId: options.channelId, limit: 20 })
-      const matched = tasks.find((task: any) => {
+      const matched = tasks.find((task: TaskListItem) => {
         const startTime = task.startTime ? new Date(task.startTime).getTime() : 0
         const reqPrompt = task.requestSnapshot?.prompt
         return startTime >= options.submitAt.getTime() - 2000 && reqPrompt === options.prompt
@@ -441,12 +550,14 @@ class MediaLunaGenerateTool extends StructuredTool {
    * 生成完成后通过 session.send 发送结果
    */
   private async generateAsync(
-    mediaLuna: any,
+    mediaLuna: MediaLunaLike,
     channelName: string,
     presetName: string | undefined,
     prompt: string,
-    files: any[],
-    session: Session | undefined
+    files: FileData[],
+    session: Session | undefined,
+    conversationId?: string,
+    messageId?: string
   ): Promise<string> {
     const channel = await mediaLuna.channels?.getByName?.(channelName)
     const submitAt = new Date()
@@ -531,12 +642,23 @@ class MediaLunaGenerateTool extends StructuredTool {
       // 这种情况下不需要后台处理，直接返回结果
       const result = raceResult.result
       const quickTaskId = result?.taskId || await taskIdPromise
+      if (conversationId && messageId && quickTaskId) {
+        bindChatLunaTask({
+          conversationId,
+          messageId,
+          taskId: quickTaskId,
+          status: result.success ? 'success' : 'failed',
+          channelName
+        })
+        this.logger.info('[MediaLunaTool] Bound quick-finish task #%s to conversation=%s messageId=%s status=%s', quickTaskId, conversationId, messageId, result.success ? 'success' : 'failed')
+      }
       return JSON.stringify({
         ok: true,
         mode: 'notify',
         tasks: quickTaskId ? [{ index: 1, taskId: quickTaskId }] : [],
         channel: channelName,
         preset: presetName,
+        messageId,
         message: quickTaskId
           ? 'Task finished quickly. Result may already be available in task query.'
           : `Task finished quickly but taskId not resolved. Query with ${getQueryToolName()}.`
@@ -548,8 +670,19 @@ class MediaLunaGenerateTool extends StructuredTool {
 
     const taskId = await taskIdPromise
 
-    // 后台继续等待生成完成并发送结果
-    this.handleAsyncResult(generationPromise, session, channelName)
+    if (conversationId && messageId && taskId) {
+      bindChatLunaTask({
+        conversationId,
+        messageId,
+        taskId,
+        status: 'processing',
+        channelName
+      })
+      this.logger.info('[MediaLunaTool] Bound async task #%s to conversation=%s messageId=%s', taskId, conversationId, messageId)
+    }
+
+      // 后台继续等待生成完成并发送结果
+      this.handleAsyncResult(generationPromise, session, channelName)
 
     // 构建返回信息
     const infoParts: string[] = []
@@ -565,6 +698,7 @@ class MediaLunaGenerateTool extends StructuredTool {
       tasks: taskId ? [{ index: 1, taskId }] : [],
       channel: channelName,
       preset: presetName,
+      messageId,
       info: infoParts,
       message: taskId
         ? 'Task started. Result will be sent to user automatically. Do not resubmit same request.'
@@ -583,6 +717,11 @@ class MediaLunaGenerateTool extends StructuredTool {
   ): Promise<void> {
     try {
       const result = await generationPromise
+
+      if (result.taskId) {
+        updateChatLunaTaskBindingStatus(result.taskId, result.success ? 'success' : 'failed')
+        this.logger.info('[MediaLunaTool] Updated task #%s binding status => %s', result.taskId, result.success ? 'success' : 'failed')
+      }
 
       if (!result.success) {
         if (session) {
@@ -633,7 +772,7 @@ class MediaLunaTaskQueryTool extends StructuredTool {
   name = getQueryToolName()
   description = 'Query Media Luna task status and output URLs by task IDs. Use this after task-mode submit tools.'
   schema: any = z.object({
-    taskIds: z.array(z.number()).min(1).max(20).describe('Task IDs returned by submit tools'),
+    taskIds: z.array(z.number()).min(1).max(20).optional().describe('Task IDs returned by submit tools'),
     waitMs: z.number().min(0).max(300000).optional().describe('Optional wait timeout in milliseconds. Default: 300000 (5 minutes, wait until all tasks finish or timeout). Set 0 for single snapshot.')
   })
 
@@ -642,21 +781,27 @@ class MediaLunaTaskQueryTool extends StructuredTool {
   }
 
   async _call(
-    input: { taskIds: number[]; waitMs?: number },
-    _runManager?: CallbackManagerForToolRun
+    input: { taskIds?: number[]; waitMs?: number },
+    _runManager?: CallbackManagerForToolRun,
+    config?: ChatLunaToolRunnable
   ): Promise<string> {
     try {
-      const mediaLuna = (this.ctx as any).mediaLuna
+      const mediaLuna = getMediaLuna(this.ctx)
       const taskService = mediaLuna?.tasks
       if (!taskService) {
         return JSON.stringify({ ok: false, error: 'Task service not available' })
       }
 
-      const taskIds = input.taskIds
+      let taskIds = input.taskIds || []
+
+      if (taskIds.length === 0) {
+        return JSON.stringify({ ok: false, error: 'No taskIds provided' })
+      }
+
       const waitMs = Math.max(0, Math.min(300000, input.waitMs ?? 300000))
       const deadline = Date.now() + waitMs
 
-      let snapshots: any[] = []
+      let snapshots: Array<TaskData | null> = []
       while (true) {
         snapshots = await Promise.all(taskIds.map((taskId) => taskService.getById(taskId)))
 
@@ -677,8 +822,8 @@ class MediaLunaTaskQueryTool extends StructuredTool {
 
         const outputs = Array.isArray(task.responseSnapshot) ? task.responseSnapshot : []
         const urls = outputs
-          .filter((asset: any) => !!asset?.url)
-          .map((asset: any) => asset.url)
+          .filter((asset: OutputAsset) => !!asset?.url)
+          .map((asset: OutputAsset) => asset.url)
 
         const errorMsg = task.status === 'failed'
           ? (task.middlewareLogs?._error?.message || '任务失败')
@@ -750,7 +895,7 @@ class MediaLunaPresetTool extends StructuredTool {
     _runManager?: CallbackManagerForToolRun
   ): Promise<string> {
     try {
-      const mediaLuna = (this.ctx as any).mediaLuna
+      const mediaLuna = getMediaLuna(this.ctx)
       if (!mediaLuna) {
         return 'Error: MediaLuna service not available'
       }
@@ -770,7 +915,7 @@ class MediaLunaPresetTool extends StructuredTool {
       // 如果指定了预设名称数组，按名称筛选
       if (input.names && input.names.length > 0) {
         const requestedNames = input.names.map(n => n.toLowerCase())
-        filtered = presets.filter((p: any) =>
+        filtered = presets.filter((p) =>
           requestedNames.includes(p.name.toLowerCase())
         )
 
@@ -780,7 +925,7 @@ class MediaLunaPresetTool extends StructuredTool {
       } else if (input.filter) {
         // 否则使用关键字筛选
         const keyword = input.filter.toLowerCase()
-        filtered = presets.filter((p: any) =>
+        filtered = presets.filter((p) =>
           p.name.toLowerCase().includes(keyword) ||
           (p.description && p.description.toLowerCase().includes(keyword))
         )
@@ -795,7 +940,7 @@ class MediaLunaPresetTool extends StructuredTool {
       }
 
       // 格式化输出 - 包含完整的预设信息
-      const presetDetails = filtered.map((p: any) => {
+      const presetDetails = filtered.map((p) => {
         const parts: string[] = []
         parts.push(`### ${p.name}`)
 

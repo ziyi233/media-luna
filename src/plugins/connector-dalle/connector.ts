@@ -52,13 +52,46 @@ function appendOptionalFormField(formData: FormData, key: string, value: unknown
   formData.append(key, String(value))
 }
 
+const requestParameterKeys = [
+  'model',
+  'apiMode',
+  'autoUseEditsForImageInput',
+  'size',
+  'quality',
+  'style',
+  'n',
+  'background',
+  'outputFormat',
+  'outputCompression',
+  'moderation',
+  'inputFidelity',
+  'user',
+  'enableImageInput',
+  'timeout',
+] as const
+
+function applyRequestParameters(
+  config: Record<string, any>,
+  parameters: Record<string, any> = {}
+): Record<string, any> {
+  const effectiveConfig = { ...config }
+  for (const key of requestParameterKeys) {
+    if (Object.prototype.hasOwnProperty.call(parameters, key)) {
+      effectiveConfig[key] = parameters[key]
+    }
+  }
+  return effectiveConfig
+}
+
 /** DALL-E 生成函数 */
 async function generate(
   ctx: Context,
   config: Record<string, any>,
   files: FileData[],
-  prompt: string
+  prompt: string,
+  parameters?: Record<string, any>
 ): Promise<OutputAsset[]> {
+  const effectiveConfig = applyRequestParameters(config, parameters)
   const {
     apiUrl,
     apiKey,
@@ -77,7 +110,7 @@ async function generate(
     user,
     enableImageInput = true,
     timeout = 600
-  } = config
+  } = effectiveConfig
 
   if (!model) {
     throw new Error('模型名称未配置')
@@ -256,7 +289,8 @@ export const DalleConnector: ConnectorDefinition = {
   generate,
 
   /** 获取请求日志 */
-  getRequestLog(config, files, prompt): ConnectorRequestLog {
+  getRequestLog(config, files, prompt, parameterOverrides): ConnectorRequestLog {
+    const effectiveConfig = applyRequestParameters(config, parameterOverrides)
     const {
       apiUrl,
       model,
@@ -273,7 +307,7 @@ export const DalleConnector: ConnectorDefinition = {
       inputFidelity,
       user,
       enableImageInput = true
-    } = config
+    } = effectiveConfig
 
     // 计算实际会发送的图片数量
     const imageCount = enableImageInput

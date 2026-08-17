@@ -221,6 +221,27 @@ export interface MiddlewareDefinition {
 /** 连接器支持的类型 */
 export type ConnectorSupportedType = 'image' | 'video' | 'audio' | 'text'
 
+/** 可由聊天指令覆盖的标准生成参数 */
+export type StandardGenerationParameter =
+  | 'mode'
+  | 'duration'
+  | 'resolution'
+  | 'aspectRatio'
+  | 'fps'
+  | 'seed'
+  | 'steps'
+  | 'cfg'
+  | 'denoise'
+  | 'motion'
+  | 'negativePrompt'
+
+/** 连接器专用的 Koishi 指令选项 */
+export interface ConnectorCommandOption {
+  name: string
+  declaration: string
+  description: string
+}
+
 /** 连接器配置字段 (与 ConfigField 相同，别名用于清晰) */
 export type ConnectorField = ConfigField
 
@@ -282,9 +303,15 @@ export interface ConnectorDefinition {
   /**
    * 默认标签
    * 创建渠道时自动填充的标签
-   * 标签用于匹配预设：text2img, img2img, text2video, img2video, text2audio
+   * 标签用于匹配预设：text2img, img2img, text2video, img2video, video2video, text2audio
    */
   defaultTags?: string[]
+
+  /** 由 Koishi 指令插件按统一名称注册的标准生成参数 */
+  commandParameters?: StandardGenerationParameter[]
+
+  /** 时间线等无法标准化的连接器专用指令选项 */
+  commandOptions?: ConnectorCommandOption[]
 
   /**
    * 执行生成

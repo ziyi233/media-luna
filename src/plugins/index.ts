@@ -21,6 +21,7 @@ import agnesImageConnectorPlugin from './connector-agnes-image'
 import agnesVideoConnectorPlugin from './connector-agnes-video'
 import openAIVideoConnectorPlugin from './connector-openai-video'
 import newAPIVideoConnectorPlugin from './connector-newapi-video'
+import xaiVideoConnectorPlugin from './connector-xai-video'
 import customFormImageConnectorPlugin from './connector-custom-form-image'
 import dalleConnectorPlugin from './connector-dalle'
 import sdWebuiConnectorPlugin from './connector-sd-webui'
@@ -65,6 +66,7 @@ export const builtinPlugins: PluginDefinition[] = [
   agnesVideoConnectorPlugin,
   openAIVideoConnectorPlugin,
   newAPIVideoConnectorPlugin,
+  xaiVideoConnectorPlugin,
   customFormImageConnectorPlugin,
   dalleConnectorPlugin,
   sdWebuiConnectorPlugin,
@@ -108,6 +110,7 @@ export {
   agnesVideoConnectorPlugin,
   openAIVideoConnectorPlugin,
   newAPIVideoConnectorPlugin,
+  xaiVideoConnectorPlugin,
   customFormImageConnectorPlugin,
   dalleConnectorPlugin,
   sdWebuiConnectorPlugin,

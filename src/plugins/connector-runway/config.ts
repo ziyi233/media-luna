@@ -9,8 +9,8 @@ export const connectorFields: ConnectorField[] = [
     label: 'API URL',
     type: 'text',
     required: true,
-    default: 'https://api.runwayml.com/v1', // 示意地址
-    placeholder: 'https://api.your-provider.com/runway',
+    default: 'https://api.dev.runwayml.com/v1',
+    placeholder: 'https://api.dev.runwayml.com/v1',
     description: 'Runway API 基础地址'
   },
   {
@@ -20,21 +20,36 @@ export const connectorFields: ConnectorField[] = [
     required: true
   },
   {
+    key: 'apiVersion',
+    label: 'API Version',
+    type: 'text',
+    default: '2024-11-06'
+  },
+  {
+    key: 'mode',
+    label: '默认模式',
+    type: 'select',
+    default: 'auto',
+    options: [
+      { label: '自动', value: 'auto' },
+      { label: '文生视频', value: 'text' },
+      { label: '图生视频', value: 'image' }
+    ]
+  },
+  {
     key: 'model',
     label: '模型',
     type: 'text',
     required: true,
-    placeholder: 'gen-3-alpha, gen-2',
+    default: 'gen4.5',
+    placeholder: 'gen4.5',
     description: '模型名称'
   },
   {
     key: 'duration',
     label: '时长 (秒)',
-    type: 'select',
-    options: [
-      { label: '5 秒', value: '5' },
-      { label: '10 秒', value: '10' }
-    ],
+    type: 'number',
+    default: 5,
     description: '生成视频的时长'
   },
   {
@@ -43,7 +58,8 @@ export const connectorFields: ConnectorField[] = [
     type: 'select',
     options: [
       { label: '16:9', value: '16:9' },
-      { label: '9:16', value: '9:16' }
+      { label: '9:16', value: '9:16' },
+      { label: '1:1', value: '1:1' }
     ]
   },
   {
@@ -51,6 +67,12 @@ export const connectorFields: ConnectorField[] = [
     label: '种子',
     type: 'number',
     placeholder: '留空随机'
+  },
+  {
+    key: 'pollInterval',
+    label: 'Poll interval (ms)',
+    type: 'number',
+    default: 5000
   },
   {
     key: 'timeout',

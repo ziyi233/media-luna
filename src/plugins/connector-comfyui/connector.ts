@@ -128,6 +128,11 @@ function modifyWorkflowToAvoidCache(workflow: any, avoidCache: boolean): any {
 
 function applyParametersToWorkflow(workflow: any, parameters: Record<string, any>, config: Record<string, any>) {
   if (!parameters || Object.keys(parameters).length === 0) return
+  parameters = {
+    ...parameters,
+    framerate: parameters.framerate ?? parameters.fps,
+    time: parameters.time ?? parameters.duration
+  }
 
   // 辅助函数：限制数值范围
   const clamp = (val: number, min?: number, max?: number) => {
@@ -793,6 +798,7 @@ export const ComfyUIConnector: ConnectorDefinition = {
   fields: connectorFields,
   cardFields: connectorCardFields,
   defaultTags: ['text2img', 'img2img', 'text2video', 'img2video', 'img2text'],
+  commandParameters: ['duration', 'resolution', 'fps', 'steps', 'cfg', 'denoise', 'motion'],
   generate,
 
   getRequestLog(config, files, prompt): ConnectorRequestLog {

@@ -2,6 +2,7 @@ import type { Session } from 'koishi'
 import type { FileData, GenerationResult } from '../../../types'
 import type { KoishiCommandsConfig } from '../config'
 import { formatGenerationResult, resolveLinkMode } from '../formatters/delivery'
+import { normalizeCommandParameters } from './parameter-options'
 import { MessageExtractor, type CollectState } from './message-extractor'
 
 export interface GenerateRequestOptions {
@@ -164,11 +165,9 @@ export async function executeGenerateWithPresetCheck(
   const summaryParts: string[] = []
   summaryParts.push(presetName ? `预设: ${presetName}` : '无预设')
   summaryParts.push(`提示词: ${actualPrompt.length} 字`)
-  summaryParts.push(`图片: ${state.files.length} 张`)
+  summaryParts.push(`素材: ${state.files.length} 个`)
 
-  const cleanOptions = { ...options }
-  delete cleanOptions.image
-  delete cleanOptions.video
+  const cleanOptions = normalizeCommandParameters(options)
 
   return executeGenerate(ctx, session, mediaLuna, {
     channelName: channel.name,

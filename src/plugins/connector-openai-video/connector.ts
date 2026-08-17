@@ -1,9 +1,9 @@
-import { Context } from 'koishi'
+import type { Context } from 'koishi'
 import type { ConnectorDefinition, ConnectorRequestLog, FileData, OutputAsset } from '../../core'
 import { connectorCardFields, connectorFields } from './config'
 
 function stripTrailingSlash(url: string): string {
-  return url.replace(/\/$/, '')
+  return url.replace(/\/+$/, '')
 }
 
 function resolveEndpoint(apiUrl: string, suffix: string): string {
@@ -14,20 +14,8 @@ function resolveEndpoint(apiUrl: string, suffix: string): string {
   return `${baseUrl}${suffix}`
 }
 
-function getInputImageUrls(parameters?: Record<string, any>): string[] {
-  const urls = parameters?.inputFileUrls
-  if (!Array.isArray(urls)) return []
-  return urls.filter((url): url is string => typeof url === 'string' && /^https?:\/\//i.test(url))
-}
-
-function appendNumber(target: Record<string, any>, key: string, value: unknown): void {
-  if (value === undefined || value === null || value === '') return
-  const parsed = Number(value)
-  if (Number.isFinite(parsed)) target[key] = parsed
-}
-
 function resolveDurationSeconds(config: Record<string, any>, parameters?: Record<string, any>): unknown {
-  return parameters?.seconds ?? parameters?.videoDurationSeconds ?? parameters?.duration ?? config.seconds
+  return parameters?.duration ?? parameters?.seconds ?? parameters?.videoDurationSeconds ?? config.seconds
 }
 
 function normalizeStatus(status: unknown): string {
@@ -49,9 +37,7 @@ function resolveVideoUrl(response: any): string | null {
 async function downloadVideoContent(ctx: Context, apiUrl: string, apiKey: string, taskId: string): Promise<string> {
   const contentUrl = resolveEndpoint(apiUrl, `/videos/${encodeURIComponent(taskId)}/content`)
   const response = await ctx.http.get(contentUrl, {
-    headers: {
-      'Authorization': `Bearer ${apiKey}`
-    },
+    headers: { Authorization: `Bearer ${apiKey}` },
     responseType: 'arraybuffer'
   })
   return `data:video/mp4;base64,${Buffer.from(response).toString('base64')}`
@@ -70,24 +56,42 @@ async function pollVideoResult(
 
   while (Date.now() - startTime < timeoutMs) {
     await new Promise(resolve => setTimeout(resolve, intervalMs))
-
     const response = await ctx.http.get(resultUrl, {
-      headers: {
-        'Authorization': `Bearer ${apiKey}`
-      }
+      headers: { Authorization: `Bearer ${apiKey}` }
     })
 
     const status = normalizeStatus(response?.status)
-    if (status === 'completed' || status === 'succeeded' || status === 'success') {
-      return response
-    }
-
-    if (status === 'failed' || status === 'error' || status === 'cancelled') {
-      throw new Error(`OpenAI Video task failed: ${response?.error?.message || response?.error || response?.message || JSON.stringify(response)}`)
+    if (['completed', 'succeeded', 'success'].includes(status)) return response
+    if (['failed', 'error', 'cancelled'].includes(status)) {
+      throw new Error(`OpenAI Video task failed: ${response?.error?.message || response?.error || response?.message || status}`)
     }
   }
 
   throw new Error('OpenAI Video task timeout')
+}
+
+export function buildCreateForm(
+  config: Record<string, any>,
+  files: FileData[],
+  prompt: string,
+  parameters?: Record<string, any>
+): FormData {
+  const form = new FormData()
+  form.append('model', String(parameters?.model ?? config.model))
+  form.append('prompt', prompt)
+
+  const resolution = parameters?.resolution ?? config.size
+  const seconds = resolveDurationSeconds(config, parameters)
+  if (resolution) form.append('size', String(resolution))
+  if (seconds != null && seconds !== '') form.append('seconds', String(seconds))
+
+  const imageFile = files.find(file => file.mime?.startsWith('image/'))
+  if (imageFile) {
+    const blob = new Blob([new Uint8Array(imageFile.data)], { type: imageFile.mime })
+    form.append('input_reference', blob, imageFile.filename || 'reference.png')
+  }
+
+  return form
 }
 
 async function generate(
@@ -101,42 +105,40 @@ async function generate(
     apiUrl,
     apiKey,
     model,
-    size,
-    fps,
-    seed,
     enableImageInput = true,
     timeout = 900,
     pollInterval = 5000
   } = config
 
-  if (!model) throw new Error('模型名称未配置')
-
-  const imageFileCount = files.filter(file => file.mime?.startsWith('image/')).length
-  const inputImageUrls = enableImageInput ? getInputImageUrls(parameters) : []
-  if (enableImageInput && imageFileCount > 0 && inputImageUrls.length === 0) {
-    throw new Error('OpenAI Video 图生视频需要可公开访问的输入图片 URL，请启用 storage-input 并配置可公网访问的存储后端')
+  if (!model) throw new Error('OpenAI video model is not configured.')
+  if (!enableImageInput && files.some(file => file.mime?.startsWith('image/'))) {
+    throw new Error('Image input is disabled for this channel.')
+  }
+  if (files.filter(file => file.mime?.startsWith('image/')).length > 1) {
+    throw new Error('OpenAI Video accepts at most one input reference image.')
   }
 
-  const body: Record<string, any> = { model, prompt }
-  if (size) body.size = size
-  appendNumber(body, 'seconds', resolveDurationSeconds(config, parameters))
-  appendNumber(body, 'fps', fps)
-  appendNumber(body, 'seed', seed)
-  if (inputImageUrls.length > 0) body.image = inputImageUrls[0]
-
   const createUrl = resolveEndpoint(apiUrl, '/videos')
-  const createResponse = await ctx.http.post(createUrl, body, {
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json'
-    },
-    timeout: timeout * 1000
-  })
+  const createResponse = await ctx.http.post(
+    createUrl,
+    buildCreateForm(config, enableImageInput ? files : [], prompt, parameters),
+    {
+      headers: { Authorization: `Bearer ${apiKey}` },
+      timeout: timeout * 1000
+    }
+  )
 
   const taskId = resolveTaskId(createResponse)
   if (!taskId) throw new Error(`Invalid OpenAI Video response: ${JSON.stringify(createResponse)}`)
 
-  const result = await pollVideoResult(ctx, apiUrl, apiKey, taskId, timeout * 1000, Math.max(1000, Number(pollInterval) || 5000))
+  const result = await pollVideoResult(
+    ctx,
+    apiUrl,
+    apiKey,
+    taskId,
+    timeout * 1000,
+    Math.max(1000, Number(pollInterval) || 5000)
+  )
   const url = resolveVideoUrl(result) || await downloadVideoContent(ctx, apiUrl, apiKey, taskId)
 
   return [{
@@ -157,27 +159,25 @@ async function generate(
 export const OpenAIVideoConnector: ConnectorDefinition = {
   id: 'openai-video',
   name: 'OpenAI Video',
-  description: 'OpenAI/Sora-compatible 视频生成连接器，支持异步任务与 content 下载',
+  description: 'Official OpenAI/Sora video generation API with input_reference support.',
   icon: 'sora',
   supportedTypes: ['video'],
   fields: connectorFields,
   cardFields: connectorCardFields,
   defaultTags: ['text2video', 'img2video'],
+  commandParameters: ['duration', 'resolution'],
   generate,
 
   getRequestLog(config, files, prompt, parameters): ConnectorRequestLog {
-    const { apiUrl, model, size, seconds, fps, enableImageInput = true } = config
-    const inputImageUrls = enableImageInput ? getInputImageUrls(parameters) : []
     return {
-      endpoint: resolveEndpoint(apiUrl, '/videos'),
-      model,
+      endpoint: resolveEndpoint(config.apiUrl, '/videos'),
+      model: parameters?.model ?? config.model,
       prompt,
       fileCount: files.filter(file => file.mime?.startsWith('image/')).length,
       parameters: {
-        size,
-        seconds: resolveDurationSeconds(config, parameters) ?? seconds,
-        fps,
-        imageInput: inputImageUrls.length > 0 || undefined
+        size: parameters?.resolution ?? config.size,
+        seconds: resolveDurationSeconds(config, parameters),
+        inputReference: files.some(file => file.mime?.startsWith('image/')) || undefined
       }
     }
   }

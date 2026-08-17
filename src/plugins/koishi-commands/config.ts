@@ -3,6 +3,8 @@
 import type { ConfigField } from '../../types'
 
 /** Koishi 聊天指令插件配置 */
+export type VideoDeliveryMode = 'forward' | 'direct' | 'auto'
+
 export interface KoishiCommandsConfig {
   /** 是否启用指令注册 */
   enabled: boolean
@@ -20,6 +22,8 @@ export interface KoishiCommandsConfig {
   linkModeExcludePlatforms: string
   /** 是否输出文本内容 */
   outputTextContent: boolean
+  /** 视频结果发送方式 */
+  videoDeliveryMode: VideoDeliveryMode
   /** 是否使用 NapCat/OneBot 的 get_file API 获取视频链接（修复 QQ 视频本地路径问题） */
   useNapCatFileApi: boolean
   /** 是否显示该渠道上次成功生成的时间 */
@@ -36,6 +40,7 @@ export const defaultKoishiCommandsConfig: KoishiCommandsConfig = {
   linkModeTags: 'nsfw',
   linkModeExcludePlatforms: '',
   outputTextContent: false,
+  videoDeliveryMode: 'forward',
   useNapCatFileApi: false,
   showLastSuccessTime: false
 }
@@ -97,6 +102,18 @@ export const koishiCommandsConfigFields: ConfigField[] = [
     type: 'boolean',
     default: false,
     description: '是否输出 API 返回的文本内容（如思考过程、模型回复等）'
+  },
+  {
+    key: 'videoDeliveryMode',
+    label: '视频发送方式',
+    type: 'select',
+    default: 'forward',
+    options: [
+      { label: '合并转发', value: 'forward' },
+      { label: '直接发送', value: 'direct' },
+      { label: '自动判断平台', value: 'auto' }
+    ],
+    description: '合并转发保留原有行为；自动模式在 OneBot、QQ 和 Red 平台直接发送，其他平台仍使用合并转发'
   },
   {
     key: 'useNapCatFileApi',

@@ -29,7 +29,7 @@ export const connectorFields: ConnectorField[] = [
     label: '尺寸',
     type: 'text',
     placeholder: '1280x720',
-    description: 'OpenAI-compatible 视频尺寸参数，留空使用服务默认值'
+    description: 'OpenAI 视频尺寸参数，例如 1280x720；留空使用服务默认值'
   },
   {
     key: 'seconds',
@@ -37,24 +37,13 @@ export const connectorFields: ConnectorField[] = [
     type: 'number',
     placeholder: '留空使用服务默认值'
   },
-  {
-    key: 'fps',
-    label: '帧率',
-    type: 'number',
-    placeholder: '留空使用服务默认值'
-  },
-  {
-    key: 'seed',
-    label: '种子',
-    type: 'number',
-    placeholder: '留空随机'
-  },
+
   {
     key: 'enableImageInput',
     label: '允许图片输入',
     type: 'boolean',
     default: true,
-    description: '启用后会将 storage-input 上传出的第一张图片 URL 作为输入图发送'
+    description: '启用后将第一张图片以 input_reference 文件字段发送'
   },
   {
     key: 'pollInterval',

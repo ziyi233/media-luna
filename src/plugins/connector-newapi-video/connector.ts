@@ -50,20 +50,19 @@ function resolveVideoUrl(response: any): string | null {
 }
 
 function buildRequestBody(config: Record<string, any>, prompt: string, inputImageUrls: string[], parameters?: Record<string, any>): Record<string, any> {
-  const {
-    model,
-    mode,
-    size,
-    width,
-    height,
-    fps,
-    seed,
-    negativePrompt
-  } = config
+  const model = parameters?.model ?? config.model
+  const mode = parameters?.mode ?? config.mode
+  const resolution = parameters?.resolution ?? config.size
+  const sizeMatch = /^(\d+)x(\d+)$/i.exec(String(resolution || ''))
+  const width = sizeMatch ? Number(sizeMatch[1]) : config.width
+  const height = sizeMatch ? Number(sizeMatch[2]) : config.height
+  const fps = parameters?.fps ?? parameters?.framerate ?? config.fps
+  const seed = parameters?.seed ?? config.seed
+  const negativePrompt = parameters?.negativePrompt ?? config.negativePrompt
 
   const body: Record<string, any> = { model, prompt }
   if (mode) body.mode = mode
-  if (size) body.size = size
+  if (resolution) body.size = resolution
   appendNumber(body, 'width', width)
   appendNumber(body, 'height', height)
   appendNumber(body, 'duration', resolveDuration(config, parameters))
@@ -177,6 +176,7 @@ export const NewAPIVideoConnector: ConnectorDefinition = {
   fields: connectorFields,
   cardFields: connectorCardFields,
   defaultTags: ['text2video', 'img2video'],
+  commandParameters: ['mode', 'duration', 'resolution', 'fps', 'seed', 'negativePrompt'],
   generate,
 
   getRequestLog(config, files, prompt, parameters): ConnectorRequestLog {

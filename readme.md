@@ -142,6 +142,11 @@ bnn 一只可爱的猫咪
    - 支持格式：`1024x1024`、`9:16`、`横屏`、`竖屏` 等
    - 注意：并非所有模型都支持此功能
 
+5. **视频生成参数**：视频连接器会按实际能力注册统一选项
+   - `-t, --duration, --time <秒>`：视频时长，三个名称指向同一参数
+   - `-r, --resolution <分辨率>`、`-a, --aspect-ratio <比例>`、`--fps`、`--seed`、`--steps`、`--cfg`
+   - 不同连接器只显示并接收自身支持的参数，单次指令参数优先于渠道配置
+
 ## 配置说明
 
 ### 全局配置 vs 渠道配置
@@ -273,6 +278,7 @@ Media Luna 支持两级配置：
 | enabled | 启用聊天指令 | `true` |
 | collectTimeout | 收集模式超时（秒） | `120` |
 | directTriggerImageCount | 直接触发所需最小图片数 | `2` |
+| videoDeliveryMode | 视频发送方式：合并转发、直接发送或自动判断平台 | `forward` |
 
 ### 连接器配置
 
@@ -291,7 +297,15 @@ Media Luna 支持两级配置：
 | ComfyUI | apiUrl | ComfyUI 服务 |
 | 豆包 | apiUrl, apiKey, model | 火山引擎 Seedream |
 | Suno | apiUrl, apiKey | Suno AI 音乐 |
+| OpenAI Video | apiUrl, apiKey, model | OpenAI 视频生成，支持可选参考图 |
 | Runway | apiUrl, apiKey, model | Runway 视频 |
+| xAI Grok Imagine Image | apiUrl, apiKey, model | 文生图、单图编辑和多图编辑 |
+
+### xAI Grok Imagine Image
+
+连接器默认使用 `grok-imagine-image-2.0`。无输入图时调用文生图接口；同一消息附带 1-3 张 JPEG、PNG 或 WebP 图片时自动进入编辑接口。图片编辑默认继承第一张输入图的宽高比，使用 `-a/--aspect-ratio` 可在单次请求中覆盖。
+
+可用指令参数：`-r/--resolution <1k|2k>`、`-a/--aspect-ratio <比例>`、`-q/--quality <low|medium>`、`-n/--count <1-10>`。其中 quality 仅用于文生图。xAI 返回的 URL 为临时地址，建议启用缓存插件及时转存；也可以将响应格式配置为 Base64。
 
 ## WebUI 页面
 

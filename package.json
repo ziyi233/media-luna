@@ -27,6 +27,7 @@
   ],
   "license": "MIT",
   "scripts": {
+    "test": "tsx --test test/*.test.*",
     "build:server": "tsc",
     "build:client": "koishi-console build",
     "build": "npm run build:server && npm run build:client"
@@ -51,6 +52,7 @@
     "@koishijs/client": "^5.30.0",
     "@koishijs/plugin-console": "^5.30.0",
     "koishi": "^4.18.7",
+    "tsx": "^4.21.0",
     "typescript": "^5.3.3"
   },
   "peerDependencies": {

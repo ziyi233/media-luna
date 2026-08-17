@@ -5,16 +5,21 @@ import {
   type VideoDurationEnhancerConfig
 } from './config'
 
-interface DurationDetection {
+export interface DurationDetection {
   seconds: number
-  token: string
+  token?: string
+  source: 'parameter' | 'prompt' | 'channel-duration' | 'channel-frames'
 }
 
-const DURATION_REGEX = /(\d+(?:\.\d+)?)\s*(s|S|秒)/i
+const DURATION_REGEX = /(\d+(?:\.\d+)?)\s*(s|\u79d2)/i
+
+function positiveNumber(value: unknown): number | null {
+  const parsed = Number(value)
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null
+}
 
 function parsePositiveNumber(value: unknown, fallback: number): number {
-  const parsed = Number(value)
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback
+  return positiveNumber(value) ?? fallback
 }
 
 function normalizeConfig(config: VideoDurationEnhancerConfig): VideoDurationEnhancerConfig {
@@ -43,24 +48,54 @@ function clampSeconds(seconds: number, config: VideoDurationEnhancerConfig): num
   return Math.min(upperBound, Math.max(config.minSeconds, seconds))
 }
 
-function parseDurationFromPrompt(prompt: string, config: VideoDurationEnhancerConfig): DurationDetection | null {
-  const match = DURATION_REGEX.exec(prompt)
-  if (!match) return null
+export function resolveDuration(mctx: MiddlewareContext, config: VideoDurationEnhancerConfig): DurationDetection | null {
+  const parameters = mctx.parameters || {}
 
-  const seconds = Number(match[1])
-  if (!Number.isFinite(seconds) || seconds <= 0) return null
-
-  return {
-    seconds: clampSeconds(seconds, config),
-    token: match[0]
+  const explicit = positiveNumber(
+    parameters.duration
+      ?? parameters.time
+      ?? parameters.seconds
+      ?? parameters.videoDurationSeconds
+  )
+  if (explicit) {
+    return { seconds: clampSeconds(explicit, config), source: 'parameter' }
   }
+
+  const match = DURATION_REGEX.exec(mctx.prompt || '')
+  if (match) {
+    const seconds = positiveNumber(match[1])
+    if (seconds) {
+      return {
+        seconds: clampSeconds(seconds, config),
+        token: match[0],
+        source: 'prompt'
+      }
+    }
+  }
+
+  const connectorConfig = mctx.channel?.connectorConfig || {}
+  const configured = positiveNumber(connectorConfig.duration ?? connectorConfig.seconds ?? connectorConfig.time)
+  if (configured) {
+    return { seconds: clampSeconds(configured, config), source: 'channel-duration' }
+  }
+
+  const frameCount = positiveNumber(connectorConfig.numFrames)
+  const frameRate = positiveNumber(connectorConfig.frameRate ?? connectorConfig.fps ?? connectorConfig.framerate)
+  if (frameCount && frameRate && frameCount >= 1) {
+    return {
+      seconds: clampSeconds(Math.max(1, frameCount - 1) / frameRate, config),
+      source: 'channel-frames'
+    }
+  }
+
+  return null
 }
 
-function cleanPromptDurationToken(prompt: string, detection: DurationDetection): string {
+function cleanPromptDurationToken(prompt: string, token: string): string {
   return prompt
-    .replace(detection.token, ' ')
-    .replace(/\s*([,，;；])\s*([,，;；])\s*/g, '$1 ')
-    .replace(/^\s*[,，;；]\s*|\s*[,，;；]\s*$/g, '')
+    .replace(token, ' ')
+    .replace(/\s*([,;\uFF0C\uFF1B])\s*([,;\uFF0C\uFF1B])\s*/g, '$1 ')
+    .replace(/^\s*[,;\uFF0C\uFF1B]\s*|\s*[,;\uFF0C\uFF1B]\s*$/g, '')
     .replace(/\s{2,}/g, ' ')
     .trim()
 }
@@ -69,7 +104,7 @@ export function createVideoDurationEnhancerMiddleware(): MiddlewareDefinition {
   return {
     name: 'video-duration-enhancer',
     displayName: '视频时长增强',
-    description: '解析提示词中的 5s/5秒 时长标记，改写视频参数并为按秒计费提供上下文',
+    description: '统一读取指令、提示词和渠道配置中的视频时长，并为按秒计费提供一致上下文',
     category: 'transform',
     phase: 'lifecycle-prepare',
     before: ['billing-prepare'],
@@ -87,7 +122,7 @@ export function createVideoDurationEnhancerMiddleware(): MiddlewareDefinition {
         return next()
       }
 
-      const detection = parseDurationFromPrompt(mctx.prompt || '', config)
+      const detection = resolveDuration(mctx, config)
       if (!detection) {
         mctx.setMiddlewareLog('video-duration-enhancer', { skipped: true, reason: 'duration not detected' })
         return next()
@@ -102,17 +137,16 @@ export function createVideoDurationEnhancerMiddleware(): MiddlewareDefinition {
         ...(config.writeDurationParameter ? { duration: seconds } : {})
       }
 
-      if (config.removeDurationFromPrompt) {
-        const cleanPrompt = cleanPromptDurationToken(mctx.prompt, detection)
-        if (cleanPrompt) {
-          mctx.prompt = cleanPrompt
-        }
+      if (config.removeDurationFromPrompt && detection.token) {
+        const cleanPrompt = cleanPromptDurationToken(mctx.prompt, detection.token)
+        if (cleanPrompt) mctx.prompt = cleanPrompt
       }
 
       mctx.setMiddlewareLog('video-duration-enhancer', {
         seconds,
-        token: detection.token.trim(),
-        promptChanged: config.removeDurationFromPrompt,
+        source: detection.source,
+        token: detection.token?.trim(),
+        promptChanged: Boolean(config.removeDurationFromPrompt && detection.token),
         billingStoreKey: BILLING_DURATION_SECONDS_KEY
       })
 

@@ -48,7 +48,7 @@ function parseBase64DataUrl(dataUrl: string): { buffer: Buffer; mime: string } |
   }
 }
 
-async function downloadAsset(url: string): Promise<{ buffer: Buffer; mime: string }> {
+export async function downloadAsset(url: string, mctx: MiddlewareContext): Promise<{ buffer: Buffer; mime: string }> {
   // 处理 base64 data URL
   if (url.startsWith('data:')) {
     const parsed = parseBase64DataUrl(url)
@@ -58,12 +58,16 @@ async function downloadAsset(url: string): Promise<{ buffer: Buffer; mime: strin
     throw new Error('无效的 base64 data URL')
   }
 
-  // 普通 URL，使用 fetch 下载
-  const resp = await fetch(url)
-  if (!resp.ok) throw new Error(`下载失败: ${resp.status}`)
-  const arrayBuffer = await resp.arrayBuffer()
-  const mime = resp.headers.get('content-type') || 'application/octet-stream'
-  return { buffer: Buffer.from(arrayBuffer), mime }
+  // 使用 Koishi HTTP 客户端以继承代理、超时和其他网络配置。
+  return mctx.ctx.http.get(url, {
+    timeout: 120000,
+    responseType: async (resp: Response) => {
+      if (!resp.ok) throw new Error(`下载失败: ${resp.status}`)
+      const arrayBuffer = await resp.arrayBuffer()
+      const mime = resp.headers.get('content-type') || 'application/octet-stream'
+      return { buffer: Buffer.from(arrayBuffer), mime }
+    }
+  })
 }
 
 /**
@@ -221,7 +225,7 @@ export function createStorageMiddleware(): MiddlewareDefinition {
         }
 
         try {
-          const { buffer, mime } = await downloadAsset(asset.url)
+          const { buffer, mime } = await downloadAsset(asset.url, mctx)
           const filename = `output-${asset.kind}-${i}`
 
           const result = await uploadToBackend(buffer, filename, mime, mctx, schemeName)

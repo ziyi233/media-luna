@@ -32,7 +32,7 @@ function appendNumber(target: Record<string, any>, key: string, value: unknown):
 }
 
 function resolveDurationSeconds(parameters?: Record<string, any>): number | null {
-  const seconds = Number(parameters?.videoDurationSeconds ?? parameters?.seconds ?? parameters?.duration)
+  const seconds = Number(parameters?.duration ?? parameters?.videoDurationSeconds ?? parameters?.seconds)
   return Number.isFinite(seconds) && seconds > 0 ? seconds : null
 }
 
@@ -40,7 +40,7 @@ function resolveNumFrames(config: Record<string, any>, parameters?: Record<strin
   const seconds = resolveDurationSeconds(parameters)
   if (!seconds) return config.numFrames
 
-  const frameRate = Number(config.frameRate) || 24
+  const frameRate = Number(parameters?.fps ?? parameters?.framerate ?? config.frameRate) || 24
   const rawFrames = Math.max(1, Math.ceil(seconds * frameRate))
   return Math.ceil((rawFrames - 1) / 8) * 8 + 1
 }
@@ -63,16 +63,16 @@ function buildRequestBody(
   inputImageUrls: string[],
   parameters?: Record<string, any>
 ): Record<string, any> {
-  const {
-    model,
-    mode,
-    width,
-    height,
-    numInferenceSteps,
-    seed,
-    frameRate,
-    negativePrompt
-  } = config
+  const model = parameters?.model ?? config.model
+  const mode = parameters?.mode ?? config.mode
+  const resolution = String(parameters?.resolution || '')
+  const sizeMatch = /^(\d+)x(\d+)$/i.exec(resolution)
+  const width = sizeMatch ? Number(sizeMatch[1]) : config.width
+  const height = sizeMatch ? Number(sizeMatch[2]) : config.height
+  const numInferenceSteps = parameters?.steps ?? config.numInferenceSteps
+  const seed = parameters?.seed ?? config.seed
+  const frameRate = parameters?.fps ?? parameters?.framerate ?? config.frameRate
+  const negativePrompt = parameters?.negativePrompt ?? config.negativePrompt
 
   const body: Record<string, any> = {
     model,
@@ -213,6 +213,7 @@ export const AgnesVideoConnector: ConnectorDefinition = {
   fields: connectorFields,
   cardFields: connectorCardFields,
   defaultTags: ['text2video', 'img2video'],
+  commandParameters: ['mode', 'duration', 'resolution', 'fps', 'steps', 'seed', 'negativePrompt'],
   generate,
 
   getRequestLog(config, files, prompt, parameters): ConnectorRequestLog {

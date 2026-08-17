@@ -463,7 +463,7 @@ const pluginsWithConfig = computed(() => {
 })
 
 // 预置标签选项
-const PRESET_TAGS = ['text2img', 'img2img', 'text2video', 'img2video', 'text2audio']
+const PRESET_TAGS = ['text2img', 'img2img', 'text2video', 'img2video', 'video2video', 'text2audio']
 
 // 标签建议（合并预置标签和当前连接器的默认标签）
 const tagSuggestions = computed(() => {

@@ -1,135 +1,147 @@
-// Runway 连接器
-// 适配 Runway Gen-3 Alpha (第三方/模拟 API)
-// 视频生成通常耗时较长，必须异步轮询
-
-import { Context } from 'koishi'
-import type { ConnectorDefinition, FileData, OutputAsset, ConnectorRequestLog } from '../../core'
+import type { Context } from 'koishi'
+import type { ConnectorDefinition, ConnectorRequestLog, FileData, OutputAsset } from '../../core'
 import { connectorFields, connectorCardFields } from './config'
 
-/** Runway 生成函数 */
+function stripTrailingSlash(value: string): string {
+  return value.replace(/\/+$/, '')
+}
+
+function fileToDataUri(file: FileData): string {
+  return `data:${file.mime};base64,${Buffer.from(file.data).toString('base64')}`
+}
+
+function normalizeRatio(value: unknown): string | undefined {
+  if (!value) return undefined
+  const aliases: Record<string, string> = {
+    '16:9': '1280:720',
+    '9:16': '720:1280',
+    '1:1': '960:960'
+  }
+  return aliases[String(value)] || String(value)
+}
+
+function normalizeMode(value: unknown, hasImage: boolean): 'text' | 'image' {
+  const mode = String(value || 'auto').toLowerCase()
+  if (mode === 'auto') return hasImage ? 'image' : 'text'
+  if (['image', 'image2video', 'img2video', 'i2v'].includes(mode)) return 'image'
+  if (['text', 'text2video', 't2v'].includes(mode)) return 'text'
+  throw new Error('Runway mode must be auto, text, or image.')
+}
+
+interface RunwayRequest {
+  endpoint: string
+  body: Record<string, any>
+  mode: 'text' | 'image'
+}
+
+export function buildRunwayRequest(
+  config: Record<string, any>,
+  files: FileData[],
+  prompt: string,
+  parameters: Record<string, any> = {}
+): RunwayRequest {
+  const images = files.filter(file => file.mime?.startsWith('image/'))
+  if (images.length > 1) throw new Error('Runway accepts at most one prompt image.')
+  const mode = normalizeMode(parameters.mode ?? config.mode, images.length > 0)
+  if (mode === 'image' && images.length !== 1) throw new Error('Runway image mode requires one image.')
+  if (mode === 'text' && images.length > 0) throw new Error('Runway text mode does not accept an image.')
+
+  const body: Record<string, any> = {
+    model: parameters.model ?? config.model,
+    promptText: prompt
+  }
+  const duration = parameters.duration ?? parameters.seconds ?? config.duration
+  const ratio = normalizeRatio(parameters.resolution ?? parameters.aspectRatio ?? config.ratio ?? config.aspectRatio)
+  const seed = parameters.seed ?? config.seed
+  if (duration != null && duration !== '') body.duration = Number(duration)
+  if (ratio) body.ratio = ratio
+  if (seed != null && seed !== '') body.seed = Number(seed)
+  if (mode === 'image') body.promptImage = fileToDataUri(images[0])
+
+  const baseUrl = stripTrailingSlash(config.apiUrl || 'https://api.dev.runwayml.com/v1')
+  return {
+    endpoint: `${baseUrl}/${mode === 'image' ? 'image_to_video' : 'text_to_video'}`,
+    body,
+    mode
+  }
+}
+
 async function generate(
   ctx: Context,
   config: Record<string, any>,
   files: FileData[],
-  prompt: string
+  prompt: string,
+  parameters?: Record<string, any>
 ): Promise<OutputAsset[]> {
-  const {
-    apiUrl,
-    apiKey,
-    model,
-    duration,
-    aspectRatio,
-    seed,
-    timeout = 600
-  } = config
+  const { apiKey, timeout = 600, pollInterval = 5000 } = config
+  if (!config.model) throw new Error('Runway model is not configured.')
 
-  if (!model) {
-    throw new Error('模型未配置')
+  const request = buildRunwayRequest(config, files, prompt, parameters)
+  const headers = {
+    Authorization: `Bearer ${apiKey}`,
+    'Content-Type': 'application/json',
+    'X-Runway-Version': config.apiVersion || '2024-11-06'
   }
+  const created = await ctx.http.post(request.endpoint, request.body, { headers })
+  const taskId = created?.id || created?.taskId
+  if (!taskId) throw new Error(`Invalid Runway response: ${JSON.stringify(created)}`)
 
-  const baseUrl = apiUrl.replace(/\/$/, '')
+  const baseUrl = stripTrailingSlash(config.apiUrl || 'https://api.dev.runwayml.com/v1')
+  const startedAt = Date.now()
+  while (Date.now() - startedAt < Number(timeout) * 1000) {
+    await new Promise(resolve => setTimeout(resolve, Math.max(1000, Number(pollInterval) || 5000)))
+    const result = await ctx.http.get(`${baseUrl}/tasks/${encodeURIComponent(taskId)}`, { headers })
+    const status = String(result?.status || '').toUpperCase()
 
-  // 1. 发起任务 (POST /image_to_video 或 /text_to_video)
-  let endpoint = `${baseUrl}/tasks` // 假设通用任务接口
-
-  const body: any = {
-    promptText: prompt,
-    model: model,
-    parameters: {}
-  }
-
-  if (duration) body.parameters.durationSeconds = Number(duration)
-  if (aspectRatio) body.parameters.aspectRatio = aspectRatio
-  if (seed !== undefined && seed !== null && seed !== '') body.parameters.seed = Number(seed)
-
-  // 处理输入图片 (Gen-3 支持 Image-to-Video)
-  const imageFile = files.find(f => f.mime.startsWith('image/'))
-  if (imageFile) {
-    const base64 = Buffer.from(imageFile.data).toString('base64')
-    body.promptImage = `data:${imageFile.mime};base64,${base64}`
-    // 或者需要先上传图片获得 URL，视具体 API 实现而定
-  }
-
-  let taskId: string
-
-  try {
-    const res = await ctx.http.post(endpoint, body, {
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json'
-      }
-    })
-
-    taskId = res.id || res.taskId
-    if (!taskId) throw new Error(`Invalid Runway response: ${JSON.stringify(res)}`)
-
-  } catch (e: any) {
-    if (e.response?.data) {
-      throw new Error(`Runway API Error: ${JSON.stringify(e.response.data)}`)
+    if (status === 'SUCCEEDED') {
+      const url = result.output?.[0] || result.url
+      if (!url) throw new Error('Runway task succeeded without an output URL.')
+      return [{
+        kind: 'video',
+        url,
+        mime: 'video/mp4',
+        meta: {
+          taskId,
+          model: request.body.model,
+          mode: request.mode,
+          duration: request.body.duration,
+          ratio: request.body.ratio
+        }
+      }]
     }
-    throw e
-  }
-
-  // 2. 轮询结果
-  const startTime = Date.now()
-  const interval = 5000
-
-  while (Date.now() - startTime < timeout * 1000) {
-    await new Promise(resolve => setTimeout(resolve, interval))
-
-    try {
-      const res = await ctx.http.get(`${baseUrl}/tasks/${taskId}`, {
-        headers: { 'Authorization': `Bearer ${apiKey}` }
-      })
-
-      const status = res.status // PENDING, RUNNING, SUCCEEDED, FAILED
-
-      if (status === 'SUCCEEDED') {
-        const url = res.output?.[0] || res.url
-        if (!url) throw new Error('Task succeeded but no URL found')
-
-        return [{
-          kind: 'video',
-          url: url,
-          mime: 'video/mp4',
-          meta: {
-            model,
-            duration,
-            taskId
-          }
-        }]
-      } else if (status === 'FAILED') {
-        throw new Error(`Runway Task Failed: ${res.failureReason || 'Unknown error'}`)
-      }
-
-    } catch (e) {
-      // ignore
+    if (['FAILED', 'CANCELLED'].includes(status)) {
+      throw new Error(`Runway task failed: ${result?.failure || result?.failureReason || status}`)
     }
   }
 
   throw new Error('Runway task timeout')
 }
 
-/** Runway 连接器定义 */
 export const RunwayConnector: ConnectorDefinition = {
   id: 'runway',
   name: 'Runway',
-  description: 'Runway Gen-3 视频生成，支持图生视频',
+  description: 'Official Runway text-to-video and image-to-video API.',
   icon: 'runway',
   supportedTypes: ['video'],
   fields: connectorFields,
   cardFields: connectorCardFields,
   defaultTags: ['text2video', 'img2video'],
+  commandParameters: ['mode', 'duration', 'resolution', 'aspectRatio', 'seed'],
   generate,
 
-  getRequestLog(config, files, prompt): ConnectorRequestLog {
-    const { apiUrl, model } = config
+  getRequestLog(config, files, prompt, parameters): ConnectorRequestLog {
+    const request = buildRunwayRequest(config, files, prompt, parameters)
     return {
-      endpoint: apiUrl,
-      model,
+      endpoint: request.endpoint,
+      model: request.body.model,
       prompt,
       fileCount: files.length,
-      parameters: {}
+      parameters: {
+        mode: request.mode,
+        duration: request.body.duration,
+        ratio: request.body.ratio,
+        seed: request.body.seed
+      }
     }
   }
 }

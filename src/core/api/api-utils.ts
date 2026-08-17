@@ -16,7 +16,7 @@ const logger = new Logger('media-luna/api')
  */
 export function getUidFromAuth(ctx: Context, authSession: any): number | null {
   // 优先使用 @koishijs/plugin-auth 的登录用户
-  if (authSession?.id) {
+  if (authSession?.id != null) {
     return authSession.id
   }
 
@@ -76,7 +76,7 @@ export function wrapAuthApiHandler<TParams, TResult>(
   return async function (this: any, params: TParams) {
     try {
       const uid = getUidFromAuth(ctx, this?.auth)
-      if (!uid) {
+      if (uid == null) {
         return { success: false, error: 'Not logged in or not bound' }
       }
       const result = await handler(params, uid)

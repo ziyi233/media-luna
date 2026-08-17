@@ -80,7 +80,7 @@ export async function resolveTaskRefsInPrompt(
     if (task.status !== 'success') {
       throw new Error(`任务「${ref.taskId}」状态为 ${task.status}，仅支持引用成功任务`)
     }
-    if (!isAdmin && uid && task.uid !== uid) {
+    if (!isAdmin && uid != null && task.uid !== uid) {
       throw new Error(`无权引用任务「${ref.taskId}」`)
     }
 

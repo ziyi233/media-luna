@@ -280,7 +280,7 @@ export function registerChatLunaVariables(
         try {
           const session = configurable?.session
           const uid = session?.user?.id
-          if (!uid) {
+          if (uid == null) {
             return '无法获取用户信息'
           }
 

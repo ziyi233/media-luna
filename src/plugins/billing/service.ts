@@ -69,7 +69,7 @@ export class BillingService {
    */
   async getBalanceBySession(session: Session, currencyValue?: string): Promise<{ balance: number; userId: number } | null> {
     const userId = await this.resolveUserIdFromSession(session)
-    if (!userId) return null
+    if (userId == null) return null
 
     const balance = await this.getBalance(userId, currencyValue)
     return { balance, userId }

@@ -66,7 +66,7 @@ export function registerCharacterProfileCommands(options: RegisterCharacterProfi
     .alias('设定列表')
     .action(async ({ session }: { session?: Session }) => {
       const uid = (session as any)?.user?.id
-      if (!uid) return '请先登录后再使用设定集'
+      if (uid == null) return '请先登录后再使用设定集'
 
       const service = mediaLuna?.getService('character-profile') as CharacterProfileService | undefined
       if (!service) return '设定集服务不可用'
@@ -91,7 +91,7 @@ export function registerCharacterProfileCommands(options: RegisterCharacterProfi
     .alias('新增设定')
     .action(async ({ session }: { session?: Session }, ...rest: string[]) => {
       const uid = (session as any)?.user?.id
-      if (!uid) return '请先登录后再使用设定集'
+      if (uid == null) return '请先登录后再使用设定集'
 
       const service = mediaLuna?.getService('character-profile') as CharacterProfileService | undefined
       if (!service) return '设定集服务不可用'
@@ -136,7 +136,7 @@ export function registerCharacterProfileCommands(options: RegisterCharacterProfi
     .alias('查看设定')
     .action(async ({ session }: { session?: Session }, name?: string) => {
       const uid = (session as any)?.user?.id
-      if (!uid) return '请先登录后再使用设定集'
+      if (uid == null) return '请先登录后再使用设定集'
 
       const service = mediaLuna?.getService('character-profile') as CharacterProfileService | undefined
       if (!service) return '设定集服务不可用'
@@ -237,7 +237,7 @@ export function registerCharacterProfileCommands(options: RegisterCharacterProfi
     .alias('添加开放设定')
     .action(async ({ session }: { session?: Session }, id?: number, targetName?: string) => {
       const uid = (session as any)?.user?.id
-      if (!uid) return '请先登录后再使用设定集'
+      if (uid == null) return '请先登录后再使用设定集'
 
       const service = mediaLuna?.getService('character-profile') as CharacterProfileService | undefined
       if (!service) return '设定集服务不可用'
@@ -261,7 +261,7 @@ export function registerCharacterProfileCommands(options: RegisterCharacterProfi
     .alias('开放设定')
     .action(async ({ session }: { session?: Session }, name?: string, summary?: string) => {
       const uid = (session as any)?.user?.id
-      if (!uid) return '请先登录后再使用设定集'
+      if (uid == null) return '请先登录后再使用设定集'
 
       const service = mediaLuna?.getService('character-profile') as CharacterProfileService | undefined
       if (!service) return '设定集服务不可用'
@@ -279,7 +279,7 @@ export function registerCharacterProfileCommands(options: RegisterCharacterProfi
     .alias('关闭开放设定')
     .action(async ({ session }: { session?: Session }, name?: string) => {
       const uid = (session as any)?.user?.id
-      if (!uid) return '请先登录后再使用设定集'
+      if (uid == null) return '请先登录后再使用设定集'
 
       const service = mediaLuna?.getService('character-profile') as CharacterProfileService | undefined
       if (!service) return '设定集服务不可用'
@@ -297,7 +297,7 @@ export function registerCharacterProfileCommands(options: RegisterCharacterProfi
     .alias('删除设定')
     .action(async ({ session }: { session?: Session }, name?: string) => {
       const uid = (session as any)?.user?.id
-      if (!uid) return '请先登录后再使用设定集'
+      if (uid == null) return '请先登录后再使用设定集'
 
       const service = mediaLuna?.getService('character-profile') as CharacterProfileService | undefined
       if (!service) return '设定集服务不可用'
@@ -353,7 +353,7 @@ async function enterCharacterProfileCollectMode(options: {
   if (!session) return '会话不可用'
 
   const uid = (session as any)?.user?.id
-  if (!uid) return '请先登录后再使用设定集'
+  if (uid == null) return '请先登录后再使用设定集'
 
   const existing = await service.getByUidAndName(uid, profileName)
   if (existing) {

@@ -11,7 +11,7 @@ export function createCharacterProfileMiddleware(): MiddlewareDefinition {
 
     async execute(context, next): Promise<MiddlewareRunStatus> {
       const service = context.getService<CharacterProfileService>('character-profile')
-      if (!service || !context.uid || !context.prompt?.trim()) {
+      if (!service || context.uid == null || !context.prompt?.trim()) {
         return next()
       }
 

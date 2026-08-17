@@ -23,7 +23,7 @@ export function registerTaskCommands(options: RegisterTaskCommandsOptions): Arra
       if (!session) return '会话不可用'
 
       const uid = (session as any)?.user?.id
-      if (!uid) return '请先登录后再查看记录'
+      if (uid == null) return '请先登录后再查看记录'
 
       const taskService = mediaLunaRef?.tasks
       const channelService = mediaLunaRef?.channels

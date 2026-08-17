@@ -98,7 +98,7 @@ async function resolveUserId(
   mctx: MiddlewareContext
 ): Promise<number | null> {
   // 优先使用 mctx.uid（来自生成请求）
-  if (mctx.uid) {
+  if (mctx.uid != null) {
     return mctx.uid
   }
 
@@ -237,7 +237,7 @@ export function createBillingPrepareMiddleware(): MiddlewareDefinition {
 
       // 解析用户 ID
       const userId = await resolveUserId(mctx.ctx, mctx)
-      if (!userId) {
+      if (userId == null) {
         mctx.setMiddlewareLog('billing-prepare', { error: true, reason: 'no user id' })
         throw new Error('无法识别用户身份，请先绑定账号')
       }

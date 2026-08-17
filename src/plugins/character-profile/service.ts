@@ -274,7 +274,7 @@ export class CharacterProfileService {
       ? this.removeSkipMarker(prompt, skipReplacementMarker)
       : prompt.trim()
 
-    if (!uid || !escapedPrompt.trim()) {
+    if (uid == null || !escapedPrompt.trim()) {
       return { prompt: escapedPrompt, files: existingFiles, matchedProfiles: [] }
     }
 

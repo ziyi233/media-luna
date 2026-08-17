@@ -213,7 +213,7 @@ export function registerTaskApi(ctx: Context): void {
 
       // 如果没有传入 uid，使用 session 或 webui-auth 的 uid
       const effectiveUid = uid ?? getUidFromAuth(ctx, this.auth)
-      if (!effectiveUid) {
+      if (effectiveUid == null) {
         return { success: false, error: 'User ID required (not logged in or not bound)' }
       }
 
@@ -233,7 +233,7 @@ export function registerTaskApi(ctx: Context): void {
   } = {}) {
     try {
       const uid = getUidFromAuth(ctx, this.auth)
-      if (!uid) {
+      if (uid == null) {
         return { success: false, error: 'Not logged in or not bound' }
       }
 
@@ -274,7 +274,7 @@ export function registerTaskApi(ctx: Context): void {
   // 获取当前用户信息（用于前端判断登录/绑定状态）
   console.addListener('media-luna/auth/me', async function (this: any) {
     // 检查 @koishijs/plugin-auth 登录
-    if (this.auth?.id) {
+    if (this.auth?.id != null) {
       return {
         success: true,
         data: {
@@ -289,7 +289,7 @@ export function registerTaskApi(ctx: Context): void {
 
     // 检查 webui-auth 绑定
     const uid = getUidFromAuth(ctx, null)
-    if (uid) {
+    if (uid != null) {
       return {
         success: true,
         data: {
@@ -313,7 +313,7 @@ export function registerTaskApi(ctx: Context): void {
   } = {}) {
     try {
       const uid = getUidFromAuth(ctx, this.auth)
-      if (!uid) {
+      if (uid == null) {
         return { success: false, error: 'Not logged in or not bound' }
       }
 
@@ -336,7 +336,7 @@ export function registerTaskApi(ctx: Context): void {
   console.addListener('media-luna/gallery/recent-images', async function (this: any, { limit }: { limit?: number } = {}) {
     try {
       const uid = getUidFromAuth(ctx, this.auth)
-      if (!uid) {
+      if (uid == null) {
         return { success: false, error: 'Not logged in or not bound' }
       }
 
@@ -358,7 +358,7 @@ export function registerTaskApi(ctx: Context): void {
     channelId?: number
   }) => {
     try {
-      if (!options.uid) {
+      if (options.uid == null) {
         return { success: false, error: 'User ID required' }
       }
 

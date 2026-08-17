@@ -8,6 +8,7 @@ import type {
 } from '../../core'
 import type { PresetMiddlewareConfig } from './config'
 import type { PresetService } from './service'
+import type { CacheService } from '../cache/service'
 
 /**
  * 创建预设中间件
@@ -39,7 +40,7 @@ export function createPresetMiddleware(): MiddlewareDefinition {
         return next()
       }
 
-      const preset = await presetService.getByName(presetName)
+      let preset = await presetService.getByName(presetName)
       if (!preset) {
         return next()
       }
@@ -50,7 +51,9 @@ export function createPresetMiddleware(): MiddlewareDefinition {
 
       // 注入预设参考图
       if (preset.referenceImages && preset.referenceImages.length > 0) {
-        const presetFiles = await loadReferenceImages(context.ctx, preset.referenceImages)
+        const presetFiles = preset.source === 'api'
+          ? await loadRemoteReferenceImages(context, preset.name, preset.referenceImages)
+          : await loadLocalReferenceImages(context, preset.name, preset.referenceImages)
         context.files = [...presetFiles, ...context.files]
       }
 
@@ -80,66 +83,71 @@ export function createPresetMiddleware(): MiddlewareDefinition {
 }
 
 /** 加载参考图 */
-async function loadReferenceImages(
-  ctx: any,
+async function loadLocalReferenceImages(
+  context: MiddlewareContext,
+  presetName: string,
+  urls: string[]
+): Promise<FileData[]> {
+  const cache = context.getService<CacheService>('cache')
+  if (!cache) throw new Error('缓存服务不可用，无法读取预设参考图')
+
+  const files: FileData[] = []
+
+  for (let index = 0; index < urls.length; index++) {
+    const loaded = await cache.loadReference(urls[index])
+    if (!loaded) {
+      throw new Error(`预设「${presetName}」的第 ${index + 1} 张参考图已丢失；请重新同步远程预设或重新上传图片`)
+    }
+    files.push(loaded)
+  }
+
+  return files
+}
+
+/** 远程预设不落本地缓存，在生成时直接读取源站媒体。 */
+async function loadRemoteReferenceImages(
+  context: MiddlewareContext,
+  presetName: string,
   urls: string[]
 ): Promise<FileData[]> {
   const files: FileData[] = []
 
-  for (const url of urls) {
+  for (let index = 0; index < urls.length; index++) {
+    const url = urls[index]
     try {
-      if (url.startsWith('http://') || url.startsWith('https://')) {
-        const response = await ctx.http.get(url, {
-          responseType: 'arraybuffer'
-        }) as ArrayBuffer
-
-        const mime = guessMimeFromUrl(url)
-        const filename = url.split('/').pop() || 'reference.png'
-
-        files.push({
-          data: response,
-          mime,
-          filename
-        })
-      } else if (url.startsWith('data:')) {
-        const matches = url.match(/^data:([^;]+);base64,(.+)$/)
-        if (matches) {
-          const mime = matches[1]
-          const base64 = matches[2]
-          const buffer = Buffer.from(base64, 'base64')
-          const parts = mime.split('/')
-          const ext = parts[1] || 'png'
-
-          files.push({
-            data: buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength),
-            mime,
-            filename: `reference.${ext}`
-          })
-        }
-      }
-    } catch {
-      // 忽略加载失败的图片
+      const data = await context.ctx.http.get<ArrayBuffer>(url, {
+        responseType: 'arraybuffer',
+        timeout: 30000
+      })
+      if (!data?.byteLength) throw new Error('响应内容为空')
+      files.push({
+        data,
+        mime: guessMimeFromUrl(url),
+        filename: getFilenameFromUrl(url, index)
+      })
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error)
+      throw new Error(`远程预设「${presetName}」的第 ${index + 1} 张参考图读取失败：${reason}`)
     }
   }
 
   return files
 }
 
-/** 从 URL 推断 MIME 类型 */
 function guessMimeFromUrl(url: string): string {
-  const ext = url.split('.').pop()?.toLowerCase()
-  switch (ext) {
-    case 'jpg':
-    case 'jpeg':
-      return 'image/jpeg'
-    case 'png':
-      return 'image/png'
-    case 'gif':
-      return 'image/gif'
-    case 'webp':
-      return 'image/webp'
-    default:
-      return 'image/png'
+  const pathname = url.split(/[?#]/, 1)[0].toLowerCase()
+  if (pathname.endsWith('.jpg') || pathname.endsWith('.jpeg')) return 'image/jpeg'
+  if (pathname.endsWith('.webp')) return 'image/webp'
+  if (pathname.endsWith('.gif')) return 'image/gif'
+  if (pathname.endsWith('.bmp')) return 'image/bmp'
+  return 'image/png'
+}
+
+function getFilenameFromUrl(url: string, index: number): string {
+  try {
+    return new URL(url).pathname.split('/').pop() || `preset-reference-${index + 1}.png`
+  } catch {
+    return `preset-reference-${index + 1}.png`
   }
 }
 

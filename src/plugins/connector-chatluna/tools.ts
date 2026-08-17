@@ -750,7 +750,8 @@ class MediaLunaGenerateTool extends StructuredTool {
           config: koishiCommandsConfig,
           platform: session.bot?.platform,
           channelTags,
-          channelName
+          channelName,
+          resolveAssetUrl: (url) => mediaLuna?.getService?.('cache')?.resolvePublicUrl?.(url) || url
         })
         if (content) {
           await session.send(content)

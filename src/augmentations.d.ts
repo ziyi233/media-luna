@@ -105,6 +105,8 @@ export interface MediaLunaAssetCache {
   backend: 'koishi' | 'local' | 's3' | 'webdav' | 'oss'
   cachedUrl: string           // 缓存后的访问 URL
   cachedKey: string           // 存储路径/key
+  persistent: boolean         // 是否为人物/预设引用的持久资源
+  storagePath: string         // 本地文件实际路径（相对 Koishi 根目录）
   mimeType: string            // MIME 类型
   fileSize: number            // 文件大小（字节）
   createdAt: Date

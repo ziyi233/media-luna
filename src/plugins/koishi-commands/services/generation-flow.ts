@@ -119,7 +119,8 @@ export async function executeGenerate(
       platform: session?.bot?.platform,
       channelName: options.channelName,
       lastSuccessTime,
-      linkModeTag
+      linkModeTag,
+      resolveAssetUrl: (url) => mediaLuna.getService?.('cache')?.resolvePublicUrl?.(url) || url
     })
   } catch (error) {
     if (session && generatingMsgIds) {

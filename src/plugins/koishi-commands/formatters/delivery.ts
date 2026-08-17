@@ -14,6 +14,7 @@ export interface FormatResultOptions {
   channelName?: string
   lastSuccessTime?: Date | null
   linkModeTag?: string | null
+  resolveAssetUrl?: (url: string) => string
 }
 
 export function resolveLinkMode(config: DeliveryPolicyConfig, channelTags: string[], platform?: string): string | null {
@@ -40,6 +41,20 @@ export function resolveLinkMode(config: DeliveryPolicyConfig, channelTags: strin
 }
 
 export function formatGenerationResult(result: GenerationResult, options: FormatResultOptions = {}): string {
+  if (options.resolveAssetUrl && result.output) {
+    result = {
+      ...result,
+      output: result.output.map((asset) => {
+        if (!asset.url) return asset
+        try {
+          return { ...asset, url: options.resolveAssetUrl!(asset.url) }
+        } catch {
+          return asset
+        }
+      })
+    }
+  }
+
   const config = options.config || {}
   const outputTextContent = config.outputTextContent ?? false
   const linkModeTag = options.linkModeTag !== undefined

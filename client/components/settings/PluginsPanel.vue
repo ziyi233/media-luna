@@ -202,7 +202,12 @@ const saveConfig = async () => {
 // 执行操作
 const executeAction = async (action: { apiEvent: string; label: string }) => {
   try {
-    const result = await send(action.apiEvent as any) as any
+    let payload: Record<string, string> | undefined
+    if (action.apiEvent === 'media-luna/cache/cleanup-orphans') {
+      if (!confirm('只会删除临时缓存目录中没有数据库记录的文件。确定继续吗？')) return
+      payload = { confirmation: 'DELETE_ORPHANS' }
+    }
+    const result = await send(action.apiEvent as any, payload as any) as any
     if (result?.success === false) {
       throw new Error(result.error || '操作失败')
     }

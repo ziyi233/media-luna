@@ -117,6 +117,7 @@ export interface CacheFileInfo {
   size: number
   createdAt?: Date
   accessedAt?: Date
+  persistent?: boolean
 }
 
 /** 缓存统计 */
@@ -126,6 +127,11 @@ export interface CacheStats {
   maxSizeMB: number
   oldestAccess: Date | null
   newestAccess: Date | null
+  backend: string
+  temporaryFiles: number
+  temporarySizeMB: number
+  persistentFiles: number
+  persistentSizeMB: number
 }
 
 // ============ 外部插件类型 ============

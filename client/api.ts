@@ -228,11 +228,11 @@ export const generateApi = {
 // 缓存 API
 export const cacheApi = {
   /** 上传文件到缓存 */
-  upload: (data: string, mime: string, filename?: string) =>
-    call<CacheFileInfo>('media-luna/cache/upload', { data, mime, filename }),
+  upload: (data: string, mime: string, filename?: string, persistent = false) =>
+    call<CacheFileInfo>('media-luna/cache/upload', { data, mime, filename, persistent }),
   /** 从 URL 下载并缓存 */
-  cacheUrl: (url: string) =>
-    call<CacheFileInfo>('media-luna/cache/cache-url', { url }),
+  cacheUrl: (url: string, persistent = false) =>
+    call<CacheFileInfo>('media-luna/cache/cache-url', { url, persistent }),
   /** 获取缓存文件信息 */
   get: (id: string) =>
     call<CacheFileInfo>('media-luna/cache/get', { id }),
@@ -248,6 +248,12 @@ export const cacheApi = {
   /** 清空所有缓存 */
   clear: () =>
     call<void>('media-luna/cache/clear'),
+  /** 修复人物设定和预设的持久引用 */
+  repairReferences: () =>
+    call<{ protected: number, moved: number, reindexed: number, rewritten: number, redownloaded: number, unrecoverable: string[], message: string }>('media-luna/cache/repair-references'),
+  /** 扫描临时缓存目录中的孤儿文件 */
+  scanOrphans: () =>
+    call<{ count: number, totalSize: number, files: string[], message: string }>('media-luna/cache/scan-orphans'),
   /** 测试存储连接 */
   test: () =>
     call<{ backend: string, url?: string, duration?: number, message: string }>('media-luna/cache/test')

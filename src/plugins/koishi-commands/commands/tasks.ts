@@ -16,6 +16,9 @@ interface RegisterTaskCommandsOptions {
 export function registerTaskCommands(options: RegisterTaskCommandsOptions): Array<() => void> {
   const { ctx, mediaLunaRef, config, logger, parentCommand } = options
   const disposables: Array<() => void> = []
+  const resolveMediaUrl = (url: string): string => {
+    return mediaLunaRef?.getService?.('cache')?.resolvePublicUrl?.(url) || url
+  }
 
   const myTasksCmd = ctx.command(`${parentCommand}.mytasks [count:number]`, '查看我的画图记录')
     .alias('mytasks')
@@ -70,12 +73,13 @@ export function registerTaskCommands(options: RegisterTaskCommandsOptions): Arra
         if (task.status === 'success' && task.responseSnapshot && task.responseSnapshot.length > 0) {
           const firstImage = task.responseSnapshot.find((a: OutputAsset) => a.kind === 'image' && a.url)
           if (firstImage && firstImage.url) {
+            const imageUrl = resolveMediaUrl(firstImage.url)
             if (linkModeTag) {
               lines.push(`📎 因渠道标签 [${linkModeTag}] 启用链接模式`)
-              lines.push(`首图链接: ${firstImage.url}`)
+              lines.push(`首图链接: ${imageUrl}`)
               forwardMessages.push(`<message>${lines.join('\n')}</message>`)
             } else {
-              forwardMessages.push(`<message>${lines.join('\n')}\n<image url="${firstImage.url}"/></message>`)
+              forwardMessages.push(`<message>${lines.join('\n')}\n<image url="${imageUrl}"/></message>`)
             }
           } else {
             forwardMessages.push(`<message>${lines.join('\n')}</message>`)
@@ -163,10 +167,11 @@ export function registerTaskCommands(options: RegisterTaskCommandsOptions): Arra
           forwardMessages.push(`<message>📥 输入图片 (${inputFiles.length} 个)</message>`)
           for (const file of inputFiles) {
             if (file.kind === 'image' && file.url) {
+              const fileUrl = resolveMediaUrl(file.url)
               if (linkModeTag) {
-                forwardMessages.push(`<message>输入图链接: ${file.url}</message>`)
+                forwardMessages.push(`<message>输入图链接: ${fileUrl}</message>`)
               } else {
-                forwardMessages.push(`<message><image url="${file.url}"/></message>`)
+                forwardMessages.push(`<message><image url="${fileUrl}"/></message>`)
               }
             }
           }
@@ -181,15 +186,17 @@ export function registerTaskCommands(options: RegisterTaskCommandsOptions): Arra
 
         for (const asset of task.responseSnapshot) {
           if (asset.kind === 'image' && asset.url) {
+            const assetUrl = resolveMediaUrl(asset.url)
             forwardMessages.push(linkModeTag
-              ? `<message>${asset.url}</message>`
-              : `<message><image url="${asset.url}"/></message>`)
+              ? `<message>${assetUrl}</message>`
+              : `<message><image url="${assetUrl}"/></message>`)
           } else if (asset.kind === 'video' && asset.url) {
+            const assetUrl = resolveMediaUrl(asset.url)
             forwardMessages.push(linkModeTag
-              ? `<message>${asset.url}</message>`
-              : `<message><video url="${asset.url}"/></message>`)
+              ? `<message>${assetUrl}</message>`
+              : `<message><video url="${assetUrl}"/></message>`)
           } else if (asset.kind === 'audio' && asset.url) {
-            forwardMessages.push(`<message><audio url="${asset.url}"/></message>`)
+            forwardMessages.push(`<message><audio url="${resolveMediaUrl(asset.url)}"/></message>`)
           } else if (asset.kind === 'text' && asset.content) {
             forwardMessages.push(`<message>文本: ${asset.content}</message>`)
           }
@@ -261,9 +268,10 @@ export function registerTaskCommands(options: RegisterTaskCommandsOptions): Arra
           }
         } else {
           for (const file of inputFiles) {
-            if (file.url && file.url.startsWith('http')) {
+            const fileUrl = file.url ? resolveMediaUrl(file.url) : ''
+            if (fileUrl.startsWith('http')) {
               try {
-                const response = await ctx.http.get(file.url, {
+                const response = await ctx.http.get(fileUrl, {
                   responseType: 'arraybuffer',
                   timeout: 30000
                 })

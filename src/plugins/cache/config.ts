@@ -56,6 +56,8 @@ export interface StorageScheme {
 export interface LocalCacheConfig {
   /** 缓存目录 */
   cacheDir: string
+  /** 人物设定与预设图片的持久目录 */
+  persistentDir: string
   /** HTTP 路由路径 */
   publicPath: string
   /** 外部访问 URL 前缀 */
@@ -206,6 +208,14 @@ export const cacheConfigFields: ConfigField[] = [
     type: 'text',
     default: 'data/media-luna/cache',
     description: '本地缓存目录路径（相对于 Koishi 根目录）',
+    showWhen: { field: 'backend', value: 'local' }
+  },
+  {
+    key: 'persistentDir',
+    label: '持久资源目录',
+    type: 'text',
+    default: 'data/media-luna/assets',
+    description: '人物设定图和本地预设媒体的保存目录，不受缓存过期和容量淘汰影响；远程预设不写入此目录',
     showWhen: { field: 'backend', value: 'local' }
   },
   {
@@ -488,6 +498,7 @@ export const defaultCacheConfig: CachePluginConfig = {
   enabled: true,
   backend: 'local',
   cacheDir: 'data/media-luna/cache',
+  persistentDir: 'data/media-luna/assets',
   publicPath: '/media-luna/cache',
   maxCacheSize: 500,
   maxFileSize: 50,

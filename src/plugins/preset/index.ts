@@ -16,7 +16,7 @@ export default definePlugin({
   services: [
     {
       name: 'preset',
-      factory: (ctx) => new PresetService(ctx.ctx)
+      factory: (ctx) => new PresetService(ctx.ctx, () => ctx.getService<CacheService>('cache'))
     },
     {
       name: 'remote-sync',

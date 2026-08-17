@@ -208,11 +208,14 @@ Media Luna 支持两级配置：
 | 配置项 | 说明 | 默认值 |
 |--------|------|--------|
 | cacheDir | 缓存目录 | `data/media-luna/cache` |
+| persistentDir | 人物设定图、预设参考图与缩略图的持久目录 | `data/media-luna/assets` |
 | publicPath | HTTP 路由路径 | `/media-luna/cache` |
 | **publicBaseUrl** | **外部访问地址（必须配置！）** | 自动检测 |
 | maxCacheSize | 最大缓存大小 (MB) | `500` |
 | maxFileSize | 单文件限制 (MB) | `50` |
 | expireDays | 过期天数 (0=永不) | `30` |
+
+人物设定图、预设参考图和预设缩略图会按内容去重并保存为持久资源，不受 `maxCacheSize`、`expireDays` 和“清空缓存”影响。缓存管理页可手动修复旧地址或缺失的远程预设资源，并可先扫描、确认后再清理未索引的孤儿文件。
 
 **publicBaseUrl 配置示例**：
 - 本地开发：`http://localhost:5140/media-luna/cache`

@@ -117,6 +117,8 @@ export function extendDatabase(ctx: Context): void {
     backend: 'string',              // 存储后端: 'local' | 's3' | 'webdav'
     cachedUrl: 'text',              // 缓存后的访问 URL
     cachedKey: 'string',            // 存储路径/key
+    persistent: { type: 'boolean', initial: false }, // 业务引用的持久资源，不参与缓存淘汰
+    storagePath: { type: 'text', initial: '' },      // 本地文件实际路径（相对 Koishi 根目录）
     mimeType: 'string',             // MIME 类型
     fileSize: 'unsigned',           // 文件大小（字节）
     createdAt: 'timestamp',

@@ -2,6 +2,7 @@ import { definePlugin } from '../../core'
 import { CharacterProfileService } from './service'
 import { createCharacterProfileMiddleware } from './middleware'
 import { characterProfileConfigFields, defaultCharacterProfileConfig, type CharacterProfileConfig } from './config'
+import type { CacheService } from '../cache/service'
 
 export default definePlugin({
   id: 'character-profile',
@@ -15,7 +16,11 @@ export default definePlugin({
   services: [
     {
       name: 'character-profile',
-      factory: (ctx) => new CharacterProfileService(ctx.ctx, () => ctx.getConfig<CharacterProfileConfig>())
+      factory: (ctx) => new CharacterProfileService(
+        ctx.ctx,
+        () => ctx.getConfig<CharacterProfileConfig>(),
+        () => ctx.getService<CacheService>('cache')
+      )
     }
   ],
 

@@ -1,6 +1,11 @@
 // 缓存管理 API
 
 import { Context } from 'koishi'
+import path from 'path'
+
+export function sanitizeOrphanFileNames(files: string[]): string[] {
+  return files.map(file => path.basename(file.replace(/\\/g, '/')))
+}
 
 /**
  * 注册缓存管理 API
@@ -21,11 +26,13 @@ export function registerCacheApi(ctx: Context): void {
   console.addListener('media-luna/cache/upload', async ({
     data,
     mime,
-    filename
+    filename,
+    persistent
   }: {
     data: string  // base64 编码的数据
     mime: string
     filename?: string
+    persistent?: boolean
   }) => {
     try {
       const { cache, error } = getCacheService()
@@ -34,7 +41,7 @@ export function registerCacheApi(ctx: Context): void {
       // 解析 base64 数据
       const buffer = Buffer.from(data, 'base64')
 
-      const cached = await cache.cache(buffer, mime, filename)
+      const cached = await cache.cache(buffer, mime, filename, undefined, { persistent })
 
       return {
         success: true,
@@ -43,7 +50,8 @@ export function registerCacheApi(ctx: Context): void {
           url: cached.url,  // 直接使用 cached.url
           filename: cached.filename,
           mime: cached.mime,
-          size: cached.size
+          size: cached.size,
+          persistent: cached.persistent
         }
       }
     } catch (error) {
@@ -52,12 +60,12 @@ export function registerCacheApi(ctx: Context): void {
   })
 
   // 从 URL 下载并缓存
-  console.addListener('media-luna/cache/cache-url', async ({ url }: { url: string }) => {
+  console.addListener('media-luna/cache/cache-url', async ({ url, persistent }: { url: string; persistent?: boolean }) => {
     try {
       const { cache, error } = getCacheService()
       if (error) return error
 
-      const cached = await cache.cacheFromUrl(url)
+      const cached = await cache.cacheFromUrl(url, { persistent })
 
       return {
         success: true,
@@ -66,7 +74,8 @@ export function registerCacheApi(ctx: Context): void {
           url: cached.url,  // 直接使用 cached.url
           filename: cached.filename,
           mime: cached.mime,
-          size: cached.size
+          size: cached.size,
+          persistent: cached.persistent
         }
       }
     } catch (error) {
@@ -93,6 +102,7 @@ export function registerCacheApi(ctx: Context): void {
           filename: cached.filename,
           mime: cached.mime,
           size: cached.size,
+          persistent: cached.persistent,
           createdAt: cached.createdAt,
           accessedAt: cached.accessedAt
         }
@@ -125,7 +135,9 @@ export function registerCacheApi(ctx: Context): void {
       if (error) return error
 
       const success = await cache.delete(id)
-      return { success }
+      return success
+        ? { success: true }
+        : { success: false, error: '该资源仍被人物设定或预设引用，不能直接删除' }
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
@@ -150,8 +162,68 @@ export function registerCacheApi(ctx: Context): void {
       const { cache, error } = getCacheService()
       if (error) return error
 
-      await cache.clearAll()
-      return { success: true }
+      const count = await cache.clearAll()
+      return { success: true, data: { count, message: `已清理 ${count} 个临时缓存，持久参考资源未受影响` } }
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
+    }
+  })
+
+  console.addListener('media-luna/cache/repair-references', async () => {
+    try {
+      const { cache, error } = getCacheService()
+      if (error) return error
+      const result = await cache.repairReferences({ downloadRemote: true, demoteUnreferenced: true })
+      const missingDetail = result.unrecoverable.length > 0
+        ? `；需重新上传：${result.unrecoverable.slice(0, 5).join('、')}${result.unrecoverable.length > 5 ? '等' : ''}`
+        : ''
+      return {
+        success: true,
+        data: {
+          ...result,
+          message: `修复完成：保护 ${result.protected}，迁移 ${result.moved}，重新登记 ${result.reindexed}，重写地址 ${result.rewritten}，远程恢复 ${result.redownloaded}，无法恢复 ${result.unrecoverable.length}${missingDetail}`
+        }
+      }
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
+    }
+  })
+
+  console.addListener('media-luna/cache/scan-orphans', async () => {
+    try {
+      const { cache, error } = getCacheService()
+      if (error) return error
+      const result = await cache.scanOrphans()
+      return {
+        success: true,
+        data: {
+          count: result.files.length,
+          totalSize: result.totalSize,
+          files: sanitizeOrphanFileNames(result.files),
+          message: `发现 ${result.files.length} 个孤儿文件，共 ${(result.totalSize / 1024 / 1024).toFixed(1)} MB`
+        }
+      }
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
+    }
+  })
+
+  console.addListener('media-luna/cache/cleanup-orphans', async ({ confirmation }: { confirmation?: string } = {}) => {
+    try {
+      if (confirmation !== 'DELETE_ORPHANS') {
+        return { success: false, error: '请先在管理界面确认清理孤儿文件' }
+      }
+      const { cache, error } = getCacheService()
+      if (error) return error
+      const result = await cache.cleanupOrphans(confirmation)
+      return {
+        success: true,
+        data: {
+          count: result.files.length,
+          totalSize: result.totalSize,
+          message: `已清理 ${result.files.length} 个孤儿文件，释放 ${(result.totalSize / 1024 / 1024).toFixed(1)} MB`
+        }
+      }
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }

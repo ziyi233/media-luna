@@ -157,101 +157,20 @@ export class RemoteSyncService {
       name: template.title,
       promptTemplate: template.prompt,
       tags,
-      // 初始时 referenceImages 为空，等缓存完成后更新
-      referenceImages: [],
+      referenceImages: referenceImagesRemote,
       referenceImagesRemote,
       parameterOverrides: {},
       source: 'api',
       enabled: true,
       remoteId: template.id,
       remoteUrl,
-      // 初始时 thumbnail 为空，等缓存完成后更新
-      thumbnail: undefined,
+      thumbnail: thumbnailRemote,
       thumbnailRemote
     }
   }
 
-  /**
-   * 缓存预设的图片资源（缩略图和参考图片）
-   * @param presetData 预设数据（需要包含 thumbnailRemote 和 referenceImagesRemote）
-   * @param thumbnailDelay 下载间隔（毫秒），用于限流
-   * @returns 更新后的预设数据（包含缓存后的 URL）
-   */
-  async cachePresetImages(
-    presetData: Omit<PresetData, 'id'>,
-    thumbnailDelay: number = 100
-  ): Promise<Omit<PresetData, 'id'>> {
-    // 检查 context 是否仍然有效
-    if (!this._ctx.scope.isActive) {
-      this._logger.debug('Context inactive, returning original preset data')
-      return {
-        ...presetData,
-        thumbnail: presetData.thumbnailRemote,
-        referenceImages: presetData.referenceImagesRemote || []
-      }
-    }
-
-    const cache = this._getCacheService()
-
-    // 如果缓存服务不可用，返回原数据（使用远程URL作为降级）
-    if (!cache || !cache.isEnabled()) {
-      this._logger.debug('Cache service not available, using remote URLs as fallback')
-      return {
-        ...presetData,
-        thumbnail: presetData.thumbnailRemote,
-        referenceImages: presetData.referenceImagesRemote || []
-      }
-    }
-
-    const result = { ...presetData }
-    const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
-
-    // 缓存缩略图
-    if (presetData.thumbnailRemote) {
-      try {
-        const cached = await cache.cacheFromUrl(presetData.thumbnailRemote)
-        // 直接使用 cached.url，它已经包含正确的存储后端 URL
-        result.thumbnail = cached.url || presetData.thumbnailRemote
-        this._logger.debug('Cached thumbnail: %s -> %s', presetData.thumbnailRemote, result.thumbnail)
-      } catch (e) {
-        this._logger.warn('Failed to cache thumbnail %s: %s', presetData.thumbnailRemote, e)
-        // 降级使用远程URL
-        result.thumbnail = presetData.thumbnailRemote
-      }
-
-      // 限流
-      if (thumbnailDelay > 0) {
-        await delay(thumbnailDelay)
-      }
-    }
-
-    // 缓存参考图片
-    const cachedReferenceImages: string[] = []
-    for (const remoteUrl of presetData.referenceImagesRemote || []) {
-      try {
-        const cached = await cache.cacheFromUrl(remoteUrl)
-        // 直接使用 cached.url，它已经包含正确的存储后端 URL
-        const cachedUrl = cached.url || remoteUrl
-        cachedReferenceImages.push(cachedUrl)
-        this._logger.debug('Cached reference image: %s -> %s', remoteUrl, cachedUrl)
-      } catch (e) {
-        this._logger.warn('Failed to cache reference image %s: %s', remoteUrl, e)
-        // 降级使用远程URL
-        cachedReferenceImages.push(remoteUrl)
-      }
-
-      // 限流
-      if (thumbnailDelay > 0) {
-        await delay(thumbnailDelay)
-      }
-    }
-    result.referenceImages = cachedReferenceImages
-
-    return result
-  }
-
   /** 执行同步 */
-  async sync(apiUrl: string, deleteRemoved: boolean = false, thumbnailDelay: number = 100): Promise<SyncResult> {
+  async sync(apiUrl: string, deleteRemoved: boolean = false, _thumbnailDelay: number = 100): Promise<SyncResult> {
     const result: SyncResult = {
       success: false,
       added: 0,
@@ -273,8 +192,10 @@ export class RemoteSyncService {
 
       const fetchResult = await this.fetchRemoteTemplates(apiUrl)
 
-      // 304 Not Modified - 数据未变化，直接返回成功
+      // 即使远端返回 304，也要将旧版本遗留的本地缓存地址恢复为远程地址。
       if (fetchResult.notModified) {
+        const restored = await this.restoreRemoteMediaReferences(apiUrl)
+        result.updated = restored.updated
         result.success = true
         result.notModified = true
         this._logger.info('Sync skipped: data not modified (304)')
@@ -289,27 +210,13 @@ export class RemoteSyncService {
 
       for (const template of remoteTemplates) {
         try {
-          // 转换为预设数据
-          let presetData = this.transformToPreset(template, apiUrl)
-
-          // 检查是否需要重新缓存图片
+          const presetData = this.transformToPreset(template, apiUrl)
           const existing = await this._presetService.getByRemoteId(template.id, apiUrl)
-          const needsCaching = this._needsImageCaching(existing, presetData)
-
-          if (needsCaching) {
-            // 缓存图片资源
-            presetData = await this.cachePresetImages(presetData, thumbnailDelay)
-            this._logger.debug('Cached images for preset: %s', template.title)
-          } else if (existing) {
-            // 保留已有的缓存URL
-            presetData.thumbnail = existing.thumbnail
-            presetData.referenceImages = existing.referenceImages
-          }
 
           if (existing) {
             // 更新时保留用户设置的 enabled 状态
             const { enabled: _ignored, ...updateData } = presetData
-            await this._presetService.update(existing.id, updateData)
+            await this._presetService.update(existing.id, updateData, { reconcile: false })
             result.updated++
             this._logger.debug('Updated preset: %s', template.title)
           } else {
@@ -324,7 +231,7 @@ export class RemoteSyncService {
                 template.title
               )
             }
-            await this._presetService.create(presetData)
+            await this._presetService.create(presetData, { reconcile: false })
             result.added++
             this._logger.debug('Created preset: %s', template.title)
           }
@@ -339,7 +246,7 @@ export class RemoteSyncService {
         for (const preset of localPresets) {
           if (preset.remoteId && !remoteIds.has(preset.remoteId)) {
             try {
-              await this._presetService.delete(preset.id)
+              await this._presetService.delete(preset.id, { reconcile: false })
               result.removed++
               this._logger.debug('Deleted preset: %s', preset.name)
             } catch (error) {
@@ -347,6 +254,14 @@ export class RemoteSyncService {
               result.errors.push(message)
             }
           }
+        }
+      }
+
+      if (result.errors.length === 0) {
+        const restored = await this.restoreRemoteMediaReferences(apiUrl)
+        result.updated += restored.updated
+        if (restored.removedCachedMedia > 0) {
+          this._logger.info('Removed %d legacy cached remote preset media files', restored.removedCachedMedia)
         }
       }
 
@@ -361,33 +276,33 @@ export class RemoteSyncService {
     }
   }
 
-  /**
-   * 判断是否需要重新缓存图片
-   * - 新预设需要缓存
-   * - 远程URL变化需要重新缓存
-   * - 本地缓存URL为空需要缓存
-   */
-  private _needsImageCaching(
-    existing: PresetData | null,
-    newData: Omit<PresetData, 'id'>
-  ): boolean {
-    // 新预设需要缓存
-    if (!existing) return true
+  /** 将旧版本缓存到本地的远程预设媒体恢复为源站 URL。 */
+  private async restoreRemoteMediaReferences(apiUrl: string): Promise<{ updated: number; removedCachedMedia: number }> {
+    const presets = await this._presetService.listByRemoteUrl(apiUrl)
+    const remoteMediaUrls = new Set<string>()
+    let updated = 0
 
-    // 缩略图远程URL变化
-    if (existing.thumbnailRemote !== newData.thumbnailRemote) return true
+    for (const preset of presets) {
+      const referenceImages = preset.referenceImagesRemote || []
+      const thumbnail = preset.thumbnailRemote || ''
+      for (const url of referenceImages) remoteMediaUrls.add(url)
+      if (thumbnail) remoteMediaUrls.add(thumbnail)
 
-    // 参考图片远程URL变化
-    const existingRemote = existing.referenceImagesRemote || []
-    const newRemote = newData.referenceImagesRemote || []
-    if (existingRemote.length !== newRemote.length) return true
-    if (!existingRemote.every((url, i) => url === newRemote[i])) return true
+      if (
+        JSON.stringify(preset.referenceImages) === JSON.stringify(referenceImages) &&
+        preset.thumbnail === thumbnail
+      ) continue
 
-    // 本地缓存URL为空（之前缓存失败或未缓存）
-    if (newData.thumbnailRemote && !existing.thumbnail) return true
-    if (newRemote.length > 0 && existing.referenceImages.length === 0) return true
+      await this._presetService.update(preset.id, { referenceImages, thumbnail }, { reconcile: false })
+      updated++
+    }
 
-    return false
+    await this._presetService.reconcileReferences(true)
+    const cache = this._getCacheService()
+    const removedCachedMedia = cache
+      ? await cache.removeCachedSources([...remoteMediaUrls])
+      : 0
+    return { updated, removedCachedMedia }
   }
 
   /**

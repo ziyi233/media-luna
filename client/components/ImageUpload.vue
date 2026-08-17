@@ -135,7 +135,7 @@ const uploadFiles = async (files: File[]) => {
       const base64 = await fileToBase64(file)
 
       // 上传到缓存，获取 URL
-      const result = await cacheApi.upload(base64, file.type, file.name)
+      const result = await cacheApi.upload(base64, file.type, file.name, true)
 
       if (!result.url) {
         message.error('缓存服务未配置 selfUrl，无法获取图片 URL')

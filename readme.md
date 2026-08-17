@@ -142,6 +142,11 @@ bnn 一只可爱的猫咪
    - 支持格式：`1024x1024`、`9:16`、`横屏`、`竖屏` 等
    - 注意：并非所有模型都支持此功能
 
+5. **视频生成参数**：视频连接器会按实际能力注册统一选项
+   - `-t, --duration, --time <秒>`：视频时长，三个名称指向同一参数
+   - `-r, --resolution <分辨率>`、`-a, --aspect-ratio <比例>`、`--fps`、`--seed`、`--steps`、`--cfg`
+   - 不同连接器只显示并接收自身支持的参数，单次指令参数优先于渠道配置
+
 ## 配置说明
 
 ### 全局配置 vs 渠道配置
@@ -273,6 +278,7 @@ Media Luna 支持两级配置：
 | enabled | 启用聊天指令 | `true` |
 | collectTimeout | 收集模式超时（秒） | `120` |
 | directTriggerImageCount | 直接触发所需最小图片数 | `2` |
+| videoDeliveryMode | 视频发送方式：合并转发、直接发送或自动判断平台 | `forward` |
 
 ### 连接器配置
 
@@ -291,6 +297,7 @@ Media Luna 支持两级配置：
 | ComfyUI | apiUrl | ComfyUI 服务 |
 | 豆包 | apiUrl, apiKey, model | 火山引擎 Seedream |
 | Suno | apiUrl, apiKey | Suno AI 音乐 |
+| OpenAI Video | apiUrl, apiKey, model | OpenAI 视频生成，支持可选参考图 |
 | Runway | apiUrl, apiKey, model | Runway 视频 |
 
 ## WebUI 页面

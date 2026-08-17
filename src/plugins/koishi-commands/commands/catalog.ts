@@ -1,6 +1,6 @@
 import type { Session } from 'koishi'
 
-type CapabilityKey = 'img2img' | 'img2video' | 'text2img' | 'text2video' | 'text2audio'
+type CapabilityKey = 'img2img' | 'img2video' | 'video2video' | 'text2img' | 'text2video' | 'text2audio'
 
 interface RegisterCatalogCommandsOptions {
   ctx: any
@@ -172,7 +172,7 @@ export function registerCatalogCommands(options: RegisterCatalogCommandsOptions)
       if (normalizedMode && !validModes.has(normalizedMode)) {
         return [
           `未知模式: ${mode}`,
-          '可选模式: all, dedupe, text2img, img2img, text2audio, text2video, img2video'
+          '可选模式: all, dedupe, text2img, img2img, text2audio, text2video, img2video, video2video'
         ].join('\n')
       }
 
@@ -316,7 +316,7 @@ export function registerCatalogCommands(options: RegisterCatalogCommandsOptions)
         lines.push(`共 ${uniqueCount} 个模型（分组累计 ${allCapabilityCount}，同一模型可出现在多个分组）`)
       }
       lines.push('用法: 模型名 [预设名] 提示词')
-      lines.push('筛选: medialuna.models <all|dedupe|text2img|img2img|text2audio|text2video|img2video>')
+      lines.push('筛选: medialuna.models <all|dedupe|text2img|img2img|text2audio|text2video|img2video|video2video>')
 
       const content = lines.join('\n')
       return `<message forward><message>${content}</message></message>`

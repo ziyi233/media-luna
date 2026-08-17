@@ -5,6 +5,7 @@ export interface DeliveryPolicyConfig {
   linkModeTags?: string
   linkModeExcludePlatforms?: string
   outputTextContent?: boolean
+  videoDeliveryMode?: 'forward' | 'direct' | 'auto'
 }
 
 export interface FormatResultOptions {
@@ -86,6 +87,12 @@ export function formatGenerationResult(result: GenerationResult, options: Format
   }
 
   if (hasVideo) {
+    const deliveryMode = config.videoDeliveryMode ?? 'forward'
+    const useDirectDelivery = deliveryMode === 'direct'
+      || (deliveryMode === 'auto' && isOneBotLikePlatform(options.platform))
+    if (useDirectDelivery) {
+      return formatDirectVideoResult(result, linkModeTag, outputTextContent, lastSuccessInfo)
+    }
     return formatVideoResult(result, linkModeTag, outputTextContent, lastSuccessInfo)
   }
 
@@ -94,6 +101,41 @@ export function formatGenerationResult(result: GenerationResult, options: Format
   }
 
   return formatStandardResult(result, outputTextContent, lastSuccessInfo)
+}
+
+function isOneBotLikePlatform(platform?: string): boolean {
+  return ['onebot', 'qq', 'red'].includes(String(platform || '').toLowerCase())
+}
+
+function formatDirectVideoResult(
+  result: GenerationResult,
+  linkModeTag: string | null = null,
+  outputTextContent: boolean = false,
+  lastSuccessInfo: string | null = null
+): string {
+  const messages: string[] = []
+  const infoLines: string[] = []
+
+  if (result.taskId) infoLines.push(`任务「${result.taskId}」`)
+  if (result.duration) infoLines.push(`耗时 ${formatDuration(result.duration)}`)
+  if (result.hints?.after?.length) infoLines.push(...result.hints.after)
+  if (infoLines.length > 0) messages.push(infoLines.join(' | '))
+  if (lastSuccessInfo) messages.push(lastSuccessInfo)
+  if (linkModeTag) messages.push(`📎 因渠道标签 [${linkModeTag}] 启用链接模式`)
+
+  for (const asset of result.output || []) {
+    if (asset.kind === 'video' && asset.url) {
+      messages.push(linkModeTag ? asset.url : `<video url="${asset.url}"/>`)
+    } else if (asset.kind === 'image' && asset.url) {
+      messages.push(linkModeTag ? asset.url : `<image url="${asset.url}"/>`)
+    } else if (asset.kind === 'audio' && asset.url) {
+      messages.push(`<audio url="${asset.url}"/>`)
+    } else if (outputTextContent && asset.kind === 'text' && asset.content) {
+      messages.push(asset.content)
+    }
+  }
+
+  return messages.join('\n')
 }
 
 function formatVideoResult(

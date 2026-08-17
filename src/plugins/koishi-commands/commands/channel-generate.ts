@@ -1,4 +1,9 @@
 import { h, type Session } from 'koishi'
+import type {
+  ConnectorCommandOption,
+  ConnectorDefinition,
+  StandardGenerationParameter
+} from '../../../core'
 import type { KoishiCommandsConfig } from '../config'
 import { MessageExtractor, type CollectState } from '../services/message-extractor'
 import {
@@ -16,6 +21,61 @@ interface RegisterChannelCommandOptions {
   config: KoishiCommandsConfig
   logger: any
   parentCommand: string
+}
+
+interface StandardCommandOption extends ConnectorCommandOption {
+  name: StandardGenerationParameter
+}
+
+const STANDARD_COMMAND_OPTIONS: Record<StandardGenerationParameter, StandardCommandOption> = {
+  mode: { name: 'mode', declaration: '--mode <mode:string>', description: '生成模式' },
+  duration: { name: 'duration', declaration: '-t, --duration, --time <duration:number>', description: '视频时长（秒）' },
+  resolution: { name: 'resolution', declaration: '-r, --resolution <resolution:string>', description: '输出分辨率' },
+  aspectRatio: { name: 'aspectRatio', declaration: '-a, --aspect-ratio <aspectRatio:string>', description: '输出宽高比' },
+  fps: { name: 'fps', declaration: '-f, --fps <fps:number>', description: '视频帧率' },
+  seed: { name: 'seed', declaration: '--seed <seed:number>', description: '随机种子' },
+  steps: { name: 'steps', declaration: '-s, --steps <steps:number>', description: '推理步数' },
+  cfg: { name: 'cfg', declaration: '-c, --cfg <cfg:number>', description: 'CFG 比例' },
+  denoise: { name: 'denoise', declaration: '-d, --denoise <denoise:number>', description: '重绘幅度' },
+  motion: { name: 'motion', declaration: '-m, --motion <motion:number>', description: '运动幅度' },
+  negativePrompt: { name: 'negativePrompt', declaration: '--negative-prompt <negativePrompt:string>', description: '负面提示词' }
+}
+
+export function registerConnectorOptions(command: any, connector: ConnectorDefinition | undefined, logger: any): void {
+  if (!connector) return
+
+  const registered = new Set<string>(Object.keys((command as any)._options || {}))
+  const registeredAliases = new Set<string>(Object.keys((command as any)._namedOptions || {}))
+  const getAliases = (declaration: string) => Array.from(
+    declaration.matchAll(/(?:^|[\s,])--?([\w-]+)/g),
+    match => match[1]
+  )
+  const addOption = (option: ConnectorCommandOption) => {
+    if (!option.name || registered.has(option.name)) return
+    const aliases = getAliases(option.declaration)
+    const conflict = aliases.find(alias => registeredAliases.has(alias))
+    if (conflict) {
+      logger.warn(`Connector ${connector.id}: command option ${option.name} conflicts with alias --${conflict}`)
+      return
+    }
+    command.option(option.name, `${option.declaration} ${option.description}`)
+    registered.add(option.name)
+    for (const alias of aliases) registeredAliases.add(alias)
+  }
+
+  for (const key of connector.commandParameters || []) {
+    const option = STANDARD_COMMAND_OPTIONS[key]
+    if (option) addOption(option)
+  }
+
+  for (const option of connector.commandOptions || []) {
+    if (STANDARD_COMMAND_OPTIONS[option.name as StandardGenerationParameter]) {
+      logger.warn(`Connector ${connector.id}: custom command option conflicts with standard parameter ${option.name}`)
+      continue
+    }
+    addOption(option)
+  }
+
 }
 
 export function registerChannelCommand(options: RegisterChannelCommandOptions): () => void {
@@ -37,29 +97,7 @@ export function registerChannelCommand(options: RegisterChannelCommandOptions): 
   if (!existingOptions.video) {
     channelCmd.option('video', '-v <url:string> 输入视频URL')
   }
-  if (channel.connectorId === 'comfyui') {
-    if (!existingOptions.resolution) {
-      channelCmd.option('resolution', '-r <resolution:string> 修改生成分辨率(如 1024x1280)')
-    }
-    if (!existingOptions.steps) {
-      channelCmd.option('steps', '-s <steps:number> 修改生成步数')
-    }
-    if (!existingOptions.cfg) {
-      channelCmd.option('cfg', '-c <cfg:number> 修改CFG比例')
-    }
-    if (!existingOptions.denoise) {
-      channelCmd.option('denoise', '-d <denoise:number> 修改重绘幅度(图生图)')
-    }
-    if (!existingOptions.framerate) {
-      channelCmd.option('framerate', '--fps <framerate:number> 修改视频帧率')
-    }
-    if (!existingOptions.time) {
-      channelCmd.option('time', '-t <time:number> 修改视频时长(秒)')
-    }
-    if (!existingOptions.motion) {
-      channelCmd.option('motion', '-m <motion:number> 修改运动幅度')
-    }
-  }
+  registerConnectorOptions(channelCmd, mediaLuna.connectors.get(channel.connectorId), logger)
 
   channelCmd
     .usage(`用法: ${commandName} [预设名] <提示词>\n可用预设: ${presets.map((p: any) => p.name).join(', ') || '无'}`)

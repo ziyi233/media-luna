@@ -10,7 +10,7 @@ export interface VideoDurationEnhancerConfig {
 }
 
 export const defaultVideoDurationEnhancerConfig: VideoDurationEnhancerConfig = {
-  matchChannelTags: 'text2video,img2video',
+  matchChannelTags: 'text2video,img2video,video2video',
   minSeconds: 1,
   maxSeconds: 0,
   removeDurationFromPrompt: true,
@@ -23,7 +23,7 @@ export const videoDurationEnhancerConfigFields: ConfigField[] = [
     key: 'matchChannelTags',
     label: '匹配渠道标签',
     type: 'text',
-    default: 'text2video,img2video',
+    default: 'text2video,img2video,video2video',
     description: '只有渠道包含这些标签时才解析时长，多个标签用逗号分隔；留空则对所有渠道生效'
   },
   {

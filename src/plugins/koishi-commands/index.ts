@@ -12,11 +12,12 @@ import { registerChannelCommand } from './commands/channel-generate'
 import { registerCatalogCommands } from './commands/catalog'
 import { registerCharacterProfileCommands } from './commands/character-profiles'
 
-type CapabilityKey = 'img2img' | 'img2video' | 'text2img' | 'text2video' | 'text2audio'
+type CapabilityKey = 'img2img' | 'img2video' | 'video2video' | 'text2img' | 'text2video' | 'text2audio'
 
 const CAPABILITY_GROUPS: Array<{ key: CapabilityKey; label: string }> = [
   { key: 'img2img', label: '图生图' },
   { key: 'img2video', label: '图生视频' },
+  { key: 'video2video', label: '视频生视频' },
   { key: 'text2img', label: '文生图' },
   { key: 'text2video', label: '文生视频' },
   { key: 'text2audio', label: '文生音频' }

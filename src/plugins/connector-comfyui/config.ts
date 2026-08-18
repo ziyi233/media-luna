@@ -24,7 +24,7 @@ export const connectorFields: ConnectorField[] = [
     key: 'workflow',
     label: '默认工作流 (JSON)',
     type: 'textarea',
-    description: '工作流 JSON（从 ComfyUI 导出的 API 格式）。使用 {{prompt}} 作为提示词占位符',
+    description: '工作流 JSON（从 ComfyUI 导出的 API 格式）。使用 {{prompt}} 作为提示词占位符，支持多行文本和特殊字符',
     default: ''
   },
   {
@@ -39,28 +39,28 @@ export const connectorFields: ConnectorField[] = [
     label: '接受图片数量',
     type: 'number',
     default: 1,
-    description: '该工作流接受的图片数量 (0-3)'
+    description: '该工作流要求的图片总数 (0-3)，包括用户图片、预设参考图和人物设定图'
   },
   {
     key: 'imageNodeId1',
     label: '图片1 输入节点 ID（可选）',
     type: 'text',
     default: '',
-    description: '第一张图片的 LoadImage 节点 ID'
+    description: '第一张图片的 LoadImage 节点 ID；留空时按工作流节点顺序自动匹配'
   },
   {
     key: 'imageNodeId2',
     label: '图片2 输入节点 ID（可选）',
     type: 'text',
     default: '',
-    description: '第二张图片的 LoadImage 节点 ID'
+    description: '第二张图片的 LoadImage 节点 ID；留空时按工作流节点顺序自动匹配'
   },
   {
     key: 'imageNodeId3',
     label: '图片3 输入节点 ID（可选）',
     type: 'text',
     default: '',
-    description: '第三张图片的 LoadImage 节点 ID'
+    description: '第三张图片的 LoadImage 节点 ID；留空时按工作流节点顺序自动匹配'
   },
   {
     key: 'avoidCache',

@@ -7,8 +7,7 @@ import type { ConnectorDefinition, FileData, OutputAsset, ConnectorRequestLog } 
 import { connectorFields, connectorCardFields } from './config'
 import { WebSocket } from 'ws'
 import FormData from 'form-data'
-
-const PROMPT_PLACEHOLDER = '{{prompt}}'
+import { applyPromptInjectionMode, assignUploadedImages, planImageAssignments } from './workflow'
 
 /** 解析服务器地址 */
 function parseServerEndpoint(apiUrl: string): string {
@@ -487,6 +486,7 @@ async function generate(
     isSecureConnection = false,
     workflow,
     promptNodeId,
+    promptInjectionMode = 'inject',
     imageCount = 1,
     imageNodeId1,
     imageNodeId2,
@@ -519,36 +519,26 @@ async function generate(
     applyParametersToWorkflow(workflowJson, parameters, config)
   }
 
-  // 2. 替换提示词
-  const workflowStr = JSON.stringify(workflowJson)
-  if (workflowStr.includes(PROMPT_PLACEHOLDER)) {
-    // 使用占位符模式
-    workflowJson = JSON.parse(workflowStr.replaceAll(PROMPT_PLACEHOLDER, prompt))
-  } else if (promptNodeId) {
-    // 使用节点 ID 模式
-    if (workflowJson[promptNodeId]?.inputs) {
-      workflowJson[promptNodeId].inputs.text = prompt
-    }
-  } else {
-    // 自动查找 CLIPTextEncode 节点
-    const textNodeKey = Object.keys(workflowJson).find(
-      k => workflowJson[k].class_type === 'CLIPTextEncode'
-    )
-    if (textNodeKey) {
-      workflowJson[textNodeKey].inputs.text = prompt
-    } else {
-      logger.warn('[comfyui] 未找到提示词节点，工作流将使用原始提示词')
-    }
+  // 2. 安全替换提示词，避免多行或引号破坏工作流 JSON。
+  const promptInjection = applyPromptInjectionMode(
+    workflowJson,
+    prompt,
+    promptNodeId,
+    promptInjectionMode
+  )
+  workflowJson = promptInjection.workflow
+  if (promptInjection.mode === 'pre-applied') {
+    logger.debug('[comfyui] Using workflow with a pre-applied prompt')
   }
 
-  // 3. 处理输入图片（支持多图）
-  // 过滤非图片文件
-  const imageFiles = files.filter(f => f.mime?.startsWith('image/'))
-
-  // 检查图片数量是否符合配置要求
-  if (imageFiles.length !== imageCount) {
-    throw new Error(`图片数量不符：需要 ${imageCount} 张，实际提供了 ${imageFiles.length} 张`)
-  }
+  // 3. 在上传前校验图片数量和节点映射。
+  const imagePlan = planImageAssignments(
+    workflowJson,
+    files,
+    imageCount,
+    [imageNodeId1, imageNodeId2, imageNodeId3]
+  )
+  const imageFiles = imagePlan.imageFiles
 
   const uploadedImages: string[] = []
 
@@ -572,70 +562,8 @@ async function generate(
       }
     }
 
-    if (uploadedImages.length > 0) {
-      logger.info('[comfyui] Images uploaded successfully. Assigning to LoadImage nodes...')
-
-      // 查找所有 LoadImage 节点
-      const loadImageNodes = Object.keys(workflowJson).filter(
-        k => workflowJson[k].class_type === 'LoadImage'
-      )
-
-      if (loadImageNodes.length === 0) {
-        logger.warn('[comfyui] Workflow has no LoadImage nodes, but input images were provided.')
-      } else {
-        const assignedNodes = new Set<string>()
-
-        // 辅助函数：尝试分配图片到节点
-        const assignImageToNode = (imageIndex: number, nodeId: string | undefined, imageFilename: string) => {
-          if (nodeId && workflowJson[nodeId]) {
-            workflowJson[nodeId].inputs.image = imageFilename
-            assignedNodes.add(nodeId)
-            logger.info('[comfyui] Assigned image %d to specified node %s', imageIndex + 1, nodeId)
-            return true
-          }
-          return false
-        }
-
-        // 1. 优先尝试分配到指定 ID 的节点
-        const imageNodeIds = [imageNodeId1, imageNodeId2, imageNodeId3]
-
-        for (let i = 0; i < uploadedImages.length; i++) {
-          const targetNodeId = imageNodeIds[i]
-          if (targetNodeId) {
-            assignImageToNode(i, targetNodeId, uploadedImages[i])
-          }
-        }
-
-        // 2. 对于没有被指定 ID 分配的图片，顺序分配给尚未使用的 LoadImage 节点
-        let currentNodeIndex = 0
-        for (let i = 0; i < uploadedImages.length; i++) {
-          // 如果该图片已经通过指定 ID 分配了，跳过
-          // (注意：这里的逻辑是，如果 imageNodeId[i] 存在且有效，上面已经处理了。
-          //  我们需要检查的是，这张图片是否 *已经* 被分配给了某个节点？ 
-          //  上面的 assignImageToNode 直接修改了 workflowJson。这里我们需要知道这张图是否已经有着落了。
-          //  为了简化，我们可以只对 *未指定* ID 的图片进行自动分配。
-
-          if (imageNodeIds[i] && workflowJson[imageNodeIds[i]]) {
-            continue // 已经指定了有效 ID，跳过自动分配
-          }
-
-          // 寻找下一个未使用的 LoadImage 节点
-          while (currentNodeIndex < loadImageNodes.length && assignedNodes.has(loadImageNodes[currentNodeIndex])) {
-            currentNodeIndex++
-          }
-
-          if (currentNodeIndex < loadImageNodes.length) {
-            const nodeId = loadImageNodes[currentNodeIndex]
-            workflowJson[nodeId].inputs.image = uploadedImages[i]
-            assignedNodes.add(nodeId)
-            logger.info('[comfyui] Auto-assigned image %d to node %s', i + 1, nodeId)
-            currentNodeIndex++ // 移动到下一个节点
-          } else {
-            logger.warn('[comfyui] No available LoadImage node for image %d', i + 1)
-          }
-        }
-      }
-    }
+    assignUploadedImages(workflowJson, imagePlan.nodeIds, uploadedImages)
+    logger.info('[comfyui] Images assigned to nodes: %s', imagePlan.nodeIds.join(', '))
   }
 
   // 4. 生成客户端 ID

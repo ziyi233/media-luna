@@ -8,7 +8,7 @@ export const connectorFields: ConnectorField[] = [
     required: true,
     default: 'https://api.example.com',
     placeholder: 'https://your-newapi.example.com',
-    description: 'NewAPI 基址，连接器会自动拼接 /v1/video/generations'
+    description: 'NewAPI 基址。无视频时优先拼接 /v1/videos/generations（404 时回退 /v1/video/generations）；有视频且开启自动 edits 时拼接 /v1/videos/edits'
   },
   {
     key: 'apiKey',
@@ -76,6 +76,20 @@ export const connectorFields: ConnectorField[] = [
     type: 'boolean',
     default: true,
     description: '启用后会将 storage-input 上传出的图片 URL 作为 image 参数发送'
+  },
+  {
+    key: 'enableVideoInput',
+    label: '允许视频输入',
+    type: 'boolean',
+    default: true,
+    description: '启用后会将 storage-input 上传出的视频 URL 作为视频编辑输入。关闭后忽略视频，不会把视频当图片发送'
+  },
+  {
+    key: 'autoUseEditsForVideoInput',
+    label: '有视频自动切 edits',
+    type: 'boolean',
+    default: true,
+    description: '默认开启。用户上传视频时走 /v1/videos/edits；无视频时走 /v1/videos/generations。不支持视频编辑的上游请关闭，避免误打 edits 接口'
   },
   {
     key: 'pollInterval',

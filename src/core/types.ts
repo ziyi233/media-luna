@@ -282,7 +282,7 @@ export interface ConnectorDefinition {
   /**
    * 默认标签
    * 创建渠道时自动填充的标签
-   * 标签用于匹配预设：text2img, img2img, text2video, img2video, text2audio
+   * 标签用于匹配预设：text2img, img2img, text2video, img2video, video2video, text2audio
    */
   defaultTags?: string[]
 

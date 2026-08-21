@@ -8,8 +8,14 @@ function stripTrailingSlash(url: string): string {
 
 function resolveEndpoint(apiUrl: string, suffix: string): string {
   const baseUrl = stripTrailingSlash(apiUrl)
-  if (/\/v1\/video\/generations(?:\/[^/]+)?$/.test(baseUrl)) {
-    return baseUrl.replace(/\/v1\/video\/generations(?:\/[^/]+)?$/, suffix)
+  // 兼容单数(/v1/video/generations)与复数(/v1/videos/generations)两种 API 路径。
+  // 若 apiUrl 显式配置了单数端点，替换时保留单数形式，避免破坏旧配置
+  const m = baseUrl.match(/\/v1\/videos?\/generations(?:\/[^/]+)?$/)
+  if (m) {
+    const matched = m[0]
+    const isPlural = /\/v1\/videos\//.test(matched)
+    const newSuffix = isPlural ? suffix : suffix.replace('/v1/videos/', '/v1/video/')
+    return baseUrl.slice(0, -matched.length) + newSuffix
   }
   return `${baseUrl}${suffix}`
 }
@@ -35,10 +41,12 @@ function normalizeStatus(status: unknown): string {
 }
 
 function resolveTaskId(response: any): string | null {
-  return response?.id || response?.task_id || response?.taskId || response?.data?.id || response?.data?.task_id || null
+  return response?.id || response?.task_id || response?.taskId || response?.request_id
+    || response?.data?.id || response?.data?.task_id || response?.data?.request_id || null
 }
 
 function resolveVideoUrl(response: any): string | null {
+  if (typeof response?.video?.url === 'string') return response.video.url
   if (typeof response?.video_url === 'string') return response.video_url
   if (typeof response?.url === 'string') return response.url
   if (typeof response?.result_url === 'string') return response.result_url
@@ -70,8 +78,9 @@ function buildRequestBody(config: Record<string, any>, prompt: string, inputImag
   appendNumber(body, 'fps', fps)
   appendNumber(body, 'seed', seed)
   if (negativePrompt) body.negative_prompt = negativePrompt
-  if (inputImageUrls.length === 1) body.image = inputImageUrls[0]
-  if (inputImageUrls.length > 1) body.image = inputImageUrls
+  // xAI/sub2api 的图生视频要求 image 为 { url } 结构，字符串 URL 会返回 422
+  if (inputImageUrls.length === 1) body.image = { url: inputImageUrls[0] }
+  if (inputImageUrls.length > 1) body.image = { url: inputImageUrls }
 
   return body
 }
@@ -84,7 +93,7 @@ async function pollVideoResult(
   timeoutMs: number,
   intervalMs: number
 ): Promise<any> {
-  const resultUrl = resolveEndpoint(apiUrl, `/v1/video/generations/${encodeURIComponent(taskId)}`)
+  const resultUrl = resolveEndpoint(apiUrl, `/v1/videos/generations/${encodeURIComponent(taskId)}`)
   const startTime = Date.now()
 
   while (Date.now() - startTime < timeoutMs) {
@@ -97,7 +106,7 @@ async function pollVideoResult(
     })
 
     const status = normalizeStatus(response?.status || response?.data?.status)
-    if (status === 'completed' || status === 'succeeded' || status === 'success') {
+    if (status === 'completed' || status === 'succeeded' || status === 'success' || status === 'done') {
       if (!resolveVideoUrl(response)) {
         throw new Error(`NewAPI Video task completed but no video URL found: ${JSON.stringify(response)}`)
       }
@@ -136,7 +145,7 @@ async function generate(
     throw new Error('NewAPI Video 图生视频需要可公开访问的输入图片 URL，请启用 storage-input 并配置可公网访问的存储后端')
   }
 
-  const createUrl = resolveEndpoint(apiUrl, '/v1/video/generations')
+  const createUrl = resolveEndpoint(apiUrl, '/v1/videos/generations')
   const requestBody = buildRequestBody(config, prompt, inputImageUrls, parameters)
   const createResponse = await ctx.http.post(createUrl, requestBody, {
     headers: {
@@ -150,8 +159,13 @@ async function generate(
   if (!taskId) throw new Error(`Invalid NewAPI Video response: ${JSON.stringify(createResponse)}`)
 
   const result = await pollVideoResult(ctx, apiUrl, apiKey, taskId, timeout * 1000, Math.max(1000, Number(pollInterval) || 5000))
-  const url = resolveVideoUrl(result)
+  let url = resolveVideoUrl(result)
   if (!url) throw new Error(`NewAPI Video task completed but no video URL found: ${JSON.stringify(result)}`)
+  // 上游可能返回相对路径（如 /v1/videos/{id}/content），补全为绝对 URL
+  if (url.startsWith('/')) {
+    const origin = new URL(stripTrailingSlash(apiUrl)).origin
+    url = origin + url
+  }
 
   return [{
     kind: 'video',
@@ -171,7 +185,7 @@ async function generate(
 export const NewAPIVideoConnector: ConnectorDefinition = {
   id: 'newapi-video',
   name: 'NewAPI Video',
-  description: 'NewAPI 通用视频生成连接器，适配 /v1/video/generations 异步任务接口',
+  description: 'NewAPI 通用视频生成连接器，适配 /v1/videos/generations 异步任务接口（兼容 /v1/video/generations）',
   icon: 'newapi',
   supportedTypes: ['video'],
   fields: connectorFields,
@@ -183,7 +197,7 @@ export const NewAPIVideoConnector: ConnectorDefinition = {
     const { apiUrl, model, mode, size, duration, fps, enableImageInput = true } = config
     const inputImageUrls = enableImageInput ? getInputImageUrls(parameters) : []
     return {
-      endpoint: resolveEndpoint(apiUrl, '/v1/video/generations'),
+      endpoint: resolveEndpoint(apiUrl, '/v1/videos/generations'),
       model,
       prompt,
       fileCount: files.filter(file => file.mime?.startsWith('image/')).length,

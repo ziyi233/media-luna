@@ -1,6 +1,7 @@
 // 存储中间件 - 将输入文件和生成结果上传到存储后端
 // 统一通过 CacheService 进行存储操作
 
+import type { Context } from 'koishi'
 import type {
   MiddlewareDefinition,
   MiddlewareContext,
@@ -16,6 +17,11 @@ import { getExtensionFromMime } from './utils'
 interface StorageMiddlewareConfig {
   /** 使用的存储方案名称（不填则使用默认） */
   schemeName?: string
+  /**
+   * 下载生成资产时附加的请求头（如需要鉴权的上游：Authorization: Bearer xxx）
+   * 部分上游（如 sub2api 中转）的视频/图片下载端点要求鉴权，不配置会 401 导致上传失败
+   */
+  downloadHeaders?: Record<string, string>
 }
 
 // ============ 工具函数 ============
@@ -48,7 +54,10 @@ function parseBase64DataUrl(dataUrl: string): { buffer: Buffer; mime: string } |
   }
 }
 
-async function downloadAsset(url: string): Promise<{ buffer: Buffer; mime: string }> {
+async function downloadAsset(
+  url: string,
+  options?: { headers?: Record<string, string>; ctx?: Context }
+): Promise<{ buffer: Buffer; mime: string }> {
   // 处理 base64 data URL
   if (url.startsWith('data:')) {
     const parsed = parseBase64DataUrl(url)
@@ -58,8 +67,24 @@ async function downloadAsset(url: string): Promise<{ buffer: Buffer; mime: strin
     throw new Error('无效的 base64 data URL')
   }
 
-  // 普通 URL，使用 fetch 下载
-  const resp = await fetch(url)
+  const headers = options?.headers || {}
+
+  // 优先使用 koishi HTTP 服务下载：自动继承全局代理配置，且支持附加请求头
+  if (options?.ctx) {
+    // ctx.http 为可调用服务（非 axios 实例），返回 fetch 风格 Response，data 为解码后的内容
+    const http = options.ctx.http as unknown as (url: string, config: Record<string, any>) => Promise<any>
+    const resp = await http(url, {
+      method: 'GET',
+      headers,
+      timeout: 60000
+    })
+    const mime = resp.headers?.get?.('content-type') || 'application/octet-stream'
+    const data = Buffer.isBuffer(resp.data) ? resp.data : Buffer.from(resp.data)
+    return { buffer: data, mime }
+  }
+
+  // 兜底：原生 fetch 下载
+  const resp = await fetch(url, { headers })
   if (!resp.ok) throw new Error(`下载失败: ${resp.status}`)
   const arrayBuffer = await resp.arrayBuffer()
   const mime = resp.headers.get('content-type') || 'application/octet-stream'
@@ -221,7 +246,10 @@ export function createStorageMiddleware(): MiddlewareDefinition {
         }
 
         try {
-          const { buffer, mime } = await downloadAsset(asset.url)
+          const { buffer, mime } = await downloadAsset(asset.url, {
+            ctx: mctx.ctx,
+            headers: middlewareConfig?.downloadHeaders
+          })
           const filename = `output-${asset.kind}-${i}`
 
           const result = await uploadToBackend(buffer, filename, mime, mctx, schemeName)

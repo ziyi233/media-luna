@@ -37,7 +37,7 @@ export const connectorFields: ConnectorField[] = [
       { label: 'generations (文生图/JSON)', value: 'generations' },
       { label: 'edits (图生图/FormData)', value: 'edits' }
     ],
-    description: 'generations 使用 JSON 格式，edits 使用 multipart/form-data 上传图片'
+    description: 'generations 使用 JSON 格式；edits 上传参考图，默认 multipart/form-data，可通过「图片输入方式」切换为 URL/JSON'
   },
   {
     key: 'autoUseEditsForImageInput',
@@ -45,6 +45,18 @@ export const connectorFields: ConnectorField[] = [
     type: 'boolean',
     default: false,
     description: '默认关闭。启用后，当用户上传参考图片时自动走 images/edits；无图片时走 images/generations'
+  },
+  {
+    key: 'imageInputMode',
+    label: '图片输入方式',
+    type: 'select',
+    default: 'base64',
+    options: [
+      { label: 'Base64（multipart）', value: 'base64' },
+      { label: 'URL（JSON）', value: 'url' }
+    ],
+    description: 'edits 模式的图片传递方式。默认 Base64 走 multipart/form-data（OpenAI 官方兼容）；选择 URL 时优先使用 storage-input 上传后的公开 URL 走 JSON 请求（适用于 xAI Grok Imagine 等只接受公网 URL 的上游，无可用公开 URL 时回退 Base64）',
+    showWhen: { field: 'enableImageInput', value: true }
   },
   {
     key: 'size',

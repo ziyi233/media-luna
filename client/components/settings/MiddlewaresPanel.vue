@@ -18,7 +18,7 @@
         <!-- 阶段标题 -->
         <div class="phase-header pop-card no-hover" :class="phase.colorClass">
           <div class="phase-icon">
-            <span>{{ phase.emoji }}</span>
+            <span><k-icon :name="phase.icon" /></span>
           </div>
           <div class="phase-info">
             <span class="phase-name">{{ phase.label }}</span>
@@ -61,7 +61,7 @@
         <!-- 阶段间连接箭头 -->
         <div v-if="phaseIndex < phases.length - 1" class="phase-connector">
           <div class="connector-line"></div>
-          <div class="connector-arrow">⬇️</div>
+          <div class="connector-arrow"><k-icon name="chevron-down" /></div>
           <div class="connector-line"></div>
         </div>
       </div>
@@ -94,35 +94,35 @@ const phases = [
     id: 'lifecycle-prepare',
     label: '准备',
     description: '验证、权限检查、任务创建',
-    emoji: '📋',
+    icon: 'tasks',
     colorClass: 'phase-prepare'
   },
   {
     id: 'lifecycle-pre-request',
     label: '预处理',
     description: '预设应用、参数处理',
-    emoji: '⚙️',
+    icon: 'settings',
     colorClass: 'phase-pre'
   },
   {
     id: 'lifecycle-request',
     label: '执行',
     description: '调用连接器生成',
-    emoji: '▶️',
+    icon: 'generate',
     colorClass: 'phase-request'
   },
   {
     id: 'lifecycle-post-request',
     label: '后处理',
     description: '结果缓存、格式转换',
-    emoji: '📦',
+    icon: 'presets',
     colorClass: 'phase-post'
   },
   {
     id: 'lifecycle-finalize',
     label: '完成',
     description: '计费结算、记录保存',
-    emoji: '✅',
+    icon: 'check',
     colorClass: 'phase-finalize'
   }
 ]
@@ -231,11 +231,11 @@ onMounted(loadMiddlewares)
   border: 2px solid var(--ml-border-color);
 }
 
-.phase-prepare .phase-icon { background: #dbeafe; }
-.phase-pre .phase-icon { background: #ede9fe; }
-.phase-request .phase-icon { background: #dcfce7; }
-.phase-post .phase-icon { background: #ffedd5; }
-.phase-finalize .phase-icon { background: #e0e7ff; }
+.phase-prepare .phase-icon { background: var(--ml-info-bg); color: var(--ml-info); border-color: var(--ml-info-border); }
+.phase-pre .phase-icon { background: var(--ml-primary-light); color: var(--ml-primary); border-color: var(--ml-primary); }
+.phase-request .phase-icon { background: var(--ml-success-bg); color: var(--ml-success); border-color: var(--ml-success-border); }
+.phase-post .phase-icon { background: var(--ml-warning-bg); color: var(--ml-warning); border-color: var(--ml-warning-border); }
+.phase-finalize .phase-icon { background: var(--ml-info-bg); color: var(--ml-info); border-color: var(--ml-info-border); }
 
 .phase-info {
   flex: 1;
@@ -262,12 +262,11 @@ onMounted(loadMiddlewares)
   min-width: 28px;
   height: 28px;
   padding: 0 10px;
-  background: var(--ml-primary);
-  border: 2px solid var(--ml-border-color);
+  background: var(--ml-primary-light);
   border-radius: 14px;
   font-size: 12px;
   font-weight: 700;
-  color: var(--ml-text);
+  color: var(--ml-primary);
 }
 
 /* 中间件列表 */
@@ -365,32 +364,32 @@ onMounted(loadMiddlewares)
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: var(--ml-cream);
-  border: 2px solid var(--ml-border-color);
+  background-color: var(--ml-bg-alt);
   border-radius: 24px;
+  box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.08);
   transition: 0.2s;
 }
 
 .slider:before {
   position: absolute;
   content: "";
-  height: 16px;
-  width: 16px;
-  left: 2px;
-  bottom: 2px;
-  background-color: var(--ml-text-muted);
+  height: 18px;
+  width: 18px;
+  left: 3px;
+  bottom: 3px;
+  background-color: #ffffff;
   border-radius: 50%;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
   transition: 0.2s;
 }
 
 .toggle-switch input:checked + .slider {
-  background-color: var(--ml-primary);
-  border-color: var(--ml-primary-dark);
+  background-color: var(--ml-primary-light);
 }
 
 .toggle-switch input:checked + .slider:before {
   transform: translateX(20px);
-  background-color: var(--ml-text);
+  background-color: var(--ml-primary);
 }
 
 /* 空状态 */

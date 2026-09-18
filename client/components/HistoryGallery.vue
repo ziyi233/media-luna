@@ -2,7 +2,7 @@
   <div class="history-gallery pop-card no-hover" :class="{ collapsed }">
     <!-- 折叠状态的侧边条 -->
     <div v-if="collapsed" class="collapsed-bar" @click="collapsed = false">
-      <span class="collapsed-emoji">📜</span>
+      <span class="collapsed-emoji"><k-icon name="file-archive" /></span>
       <span class="collapsed-text">历史</span>
     </div>
 
@@ -14,25 +14,25 @@
           <span class="gallery-count" v-if="total > 0">{{ total }}</span>
         </div>
         <div class="header-actions">
-          <span class="action-icon" :class="{ spinning: loading }" @click="refresh" title="刷新">🔄</span>
-          <span class="action-icon" @click="collapsed = true" title="收起">➡️</span>
+          <span class="action-icon" :class="{ spinning: loading }" @click="refresh" title="刷新"><k-icon name="refresh" /></span>
+          <span class="action-icon" @click="collapsed = true" title="收起"><k-icon name="chevron-right" /></span>
         </div>
       </div>
 
       <!-- 未登录提示 -->
       <div v-if="!loggedIn" class="gallery-empty">
-        <span class="empty-icon">👤</span>
+        <span class="empty-icon"><k-icon name="user" /></span>
         <p>请登录查看历史</p>
       </div>
 
       <!-- 加载中 -->
       <div v-else-if="loading && tasks.length === 0" class="gallery-loading">
-        <span class="spin">🔄</span>
+        <k-icon name="refresh" class="spin" />
       </div>
 
       <!-- 空状态 -->
       <div v-else-if="tasks.length === 0" class="gallery-empty">
-        <span class="empty-icon">🖼️</span>
+        <k-icon name="image" class="empty-icon" />
         <p>暂无记录</p>
       </div>
 
@@ -69,7 +69,7 @@
                 @mouseleave="($event.target as HTMLVideoElement).pause()"
               />
               <div class="media-type-badge video-badge">
-                <span>▶️</span>
+                <span><k-icon name="play" /></span>
               </div>
               <div v-if="task.media.length > 1" class="more-images">
                 +{{ task.media.length - 1 }}
@@ -101,7 +101,7 @@
 
           <!-- 失败状态 -->
           <div v-else-if="task.status === 'failed'" class="task-failed">
-            <span class="failed-icon">⚠️</span>
+            <k-icon name="warning" class="failed-icon" />
             <span>失败</span>
           </div>
 
@@ -117,7 +117,7 @@
 
         <!-- 加载更多 -->
         <div v-if="loading && tasks.length > 0" class="loading-more">
-          <span class="spin">🔄</span>
+          <k-icon name="refresh" class="spin" />
         </div>
       </div>
     </div>

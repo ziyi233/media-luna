@@ -4,7 +4,7 @@
       <div class="modal-dialog pop-card no-hover">
         <div class="modal-header">
           <h3>{{ isEdit ? '编辑预设' : '新建预设' }}</h3>
-          <button class="modal-close" @click="close">✕</button>
+          <button class="modal-close" @click="close"><k-icon name="close" /></button>
         </div>
         <div class="modal-body pop-scrollbar">
           <div class="form-group">
@@ -400,30 +400,31 @@ const handleSubmit = async () => {
   right: 0;
   bottom: 0;
   background-color: var(--ml-bg-alt);
-  border: 2px solid var(--ml-border-color);
+  border: none;
   border-radius: 26px;
+  box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.08);
   transition: 0.2s;
 }
 
 .toggle-slider::before {
   position: absolute;
   content: "";
-  height: 18px;
-  width: 18px;
-  left: 2px;
-  bottom: 2px;
-  background-color: var(--ml-text-muted);
+  height: 20px;
+  width: 20px;
+  left: 3px;
+  bottom: 3px;
+  background-color: #ffffff;
+  border: none;
   border-radius: 50%;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
   transition: 0.2s;
 }
 
 .toggle-switch input:checked + .toggle-slider {
   background-color: var(--ml-primary);
-  border-color: var(--ml-primary-dark);
 }
 
 .toggle-switch input:checked + .toggle-slider::before {
   transform: translateX(22px);
-  background-color: var(--ml-text);
 }
 </style>

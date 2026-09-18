@@ -6,35 +6,30 @@
           <div class="lightbox-content">
             <!-- 左侧媒体区域 -->
             <div class="lightbox-media-area" @click.self="close">
-              <!-- 关闭按钮 -->
-              <button class="close-btn" @click="close" title="关闭 (Esc)">
-                <span>✕</span>
-              </button>
-
               <!-- 加载中 -->
               <div v-if="loading" class="loading-state">
-                <span class="spin">🔄</span>
+                <k-icon name="refresh" class="spin" />
               </div>
 
               <template v-else>
                 <!-- 多媒体时的导航 -->
                 <button v-if="mediaList.length > 1" class="nav-btn prev" @click.stop="prevMedia" title="上一个">
-                  <span>◀</span>
+                  <span><k-icon name="chevron-left" /></span>
                 </button>
 
                 <!-- 无媒体时的状态占位 -->
                 <div v-if="mediaList.length === 0" class="no-media-placeholder">
                   <template v-if="taskData?.status === 'processing' || taskData?.status === 'pending'">
-                    <span class="placeholder-icon spin">⏳</span>
+                    <k-icon name="loader" class="placeholder-icon spin" />
                     <span class="placeholder-text">{{ taskData.status === 'processing' ? '生成中...' : '等待中...' }}</span>
                   </template>
                   <template v-else-if="taskData?.status === 'failed'">
-                    <span class="placeholder-icon">❌</span>
+                    <k-icon name="times-full" class="placeholder-icon" />
                     <span class="placeholder-text">生成失败</span>
                     <span v-if="errorMessage" class="placeholder-error">{{ errorMessage }}</span>
                   </template>
                   <template v-else>
-                    <span class="placeholder-icon">📭</span>
+                    <span class="placeholder-icon"><k-icon name="inbox" /></span>
                     <span class="placeholder-text">无输出内容</span>
                   </template>
                 </div>
@@ -62,7 +57,7 @@
                 </div>
 
                 <button v-if="mediaList.length > 1" class="nav-btn next" @click.stop="nextMedia" title="下一个">
-                  <span>▶</span>
+                  <span><k-icon name="chevron-right" /></span>
                 </button>
 
                 <!-- 媒体计数器 -->
@@ -77,7 +72,7 @@
               <div class="sidebar-header">
                 <div class="info-title">{{ sidebarTitle }}</div>
                 <button class="header-close-btn" @click="close" title="关闭">
-                  <span>✕</span>
+                  <span><k-icon name="close" /></span>
                 </button>
               </div>
 
@@ -95,13 +90,13 @@
                       @error="($event.target as HTMLImageElement).style.display = 'none'"
                     />
                     <div v-else class="user-avatar-placeholder">
-                      <span>👤</span>
+                      <span><k-icon name="user" /></span>
                     </div>
                     <span class="user-name">{{ userInfo?.name || `UID: ${taskData.uid}` }}</span>
                   </div>
                   <div class="user-info" v-else>
                     <div class="user-avatar-placeholder">
-                      <span>👤</span>
+                      <span><k-icon name="user" /></span>
                     </div>
                     <span class="user-name">匿名用户</span>
                   </div>
@@ -132,7 +127,7 @@
                     <span>使用预设</span>
                   </div>
                   <div class="preset-tag">
-                    <span class="preset-icon">🎨</span>
+                    <k-icon name="image" class="preset-icon" />
                     <span class="preset-name">{{ presetInfo.name }}</span>
                     <span v-if="presetInfo.referenceCount > 0" class="preset-ref">
                       +{{ presetInfo.referenceCount }}图
@@ -182,14 +177,14 @@
                 <template v-if="mediaList.length > 0">
                   <div class="footer-row">
                     <button class="pop-btn primary" @click="openOriginal">
-                      🔗 {{ currentMedia?.kind === 'audio' ? '音频' : currentMedia?.kind === 'video' ? '视频' : '原图' }}
+                      <k-icon name="link" /> {{ currentMedia?.kind === 'audio' ? '音频' : currentMedia?.kind === 'video' ? '视频' : '原图' }}
                     </button>
                     <button class="pop-btn" @click="downloadMedia">
-                      💾 下载
+                      <k-icon name="download" /> 下载
                     </button>
                   </div>
                   <button v-if="canSaveAsPreset" class="pop-btn full-width" @click="openSaveAsPreset">
-                    🎨 保存为预设
+                    <k-icon name="image" /> 保存为预设
                   </button>
                 </template>
                 <template v-else>
@@ -218,6 +213,7 @@
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { taskApi, userApi } from '../api'
 import type { TaskData, AssetKind } from '../types'
+import { copyToClipboard } from '../utils/clipboard'
 import AudioPlayer from './AudioPlayer.vue'
 import PresetDialog from './PresetDialog.vue'
 import StatusBadge from './StatusBadge.vue'
@@ -436,11 +432,11 @@ const nextMedia = () => {
   currentIndex.value = (currentIndex.value + 1) % mediaList.value.length
 }
 
-const copyPrompt = () => {
-  if (displayPrompt.value) {
-    navigator.clipboard.writeText(displayPrompt.value)
-    alert('已复制提示词')
-  }
+const copyPrompt = async () => {
+  if (!displayPrompt.value) return
+  const ok = await copyToClipboard(displayPrompt.value)
+  if (ok) alert('已复制提示词')
+  else alert('复制失败，请手动复制')
 }
 
 const openOriginal = () => {
@@ -557,9 +553,7 @@ const handlePresetSaved = () => {
 .lightbox-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: rgba(0, 0, 0, 0.68);
   z-index: 9999;
   display: flex;
   align-items: center;
@@ -686,33 +680,6 @@ const handlePresetSaved = () => {
   font-size: 0.85rem;
   font-weight: 700;
   color: var(--ml-text-muted);
-}
-
-/* 关闭按钮 */
-.close-btn {
-  position: absolute;
-  top: 16px;
-  left: 16px;
-  z-index: 10;
-  background: rgba(251, 191, 36, 0.9);
-  border: 2px solid var(--ml-border-color);
-  color: var(--ml-text);
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s;
-  font-size: 1.1rem;
-  font-weight: 700;
-  box-shadow: 2px 2px 0 var(--ml-border-color);
-}
-
-.close-btn:hover {
-  background: var(--ml-primary);
-  transform: scale(1.05);
 }
 
 /* 导航按钮 */
@@ -1062,11 +1029,6 @@ const handlePresetSaved = () => {
     width: 100%;
     border-left: none;
     border-top: 3px solid var(--ml-border-color);
-  }
-
-  .close-btn {
-    top: 12px;
-    left: 12px;
   }
 }
 </style>

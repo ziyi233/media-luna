@@ -26,6 +26,42 @@ export const iconPaths = {
 
   /** 更新 - 向上箭头 */
   update: 'M4 12l1.41 1.41L11 7.83V20h2V7.83l5.58 5.59L20 12l-8-8-8 8z',
+
+  /** 复制 */
+  copy: 'M19,21H8V7H19M19,5H8A2,2 0 0,0 6,7V21A2,2 0 0,0 8,23H19A2,2 0 0,0 21,21V7A2,2 0 0,0 19,5M16,1H4A2,2 0 0,0 2,3V17H4V3H16V1Z',
+
+  /** 下载 */
+  download: 'M5,20H19V18H5M19,9H15V3H9V9H5L12,16L19,9Z',
+
+  /** 刷新 */
+  refresh: 'M17.65,6.35C16.2,4.9 14.21,4 12,4A8,8 0 0,0 4,12A8,8 0 0,0 12,20C15.73,20 18.84,17.45 19.73,14H17.65C16.83,16.33 14.61,18 12,18A6,6 0 0,1 6,12A6,6 0 0,1 12,6C13.66,6 15.14,6.69 16.22,7.78L13,11H20V4L17.65,6.35Z',
+
+  /** 播放 */
+  play: 'M8 5.14v14l11-7-11-7z',
+
+  /** 暂停 */
+  pause: 'M6 5h4v14H6zm8 0h4v14h-4z',
+
+  /** 保存 */
+  save: 'M17 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V7l-4-4zm-5 16a3 3 0 1 1 0-6 3 3 0 0 1 0 6zm3-10H5V5h10z',
+
+  /** 勾选 / 成功 */
+  check: 'M21 7L9 19l-5-5 1.41-1.41L9 16.17 19.59 5.59 21 7z',
+
+  /** 警告 */
+  warning: 'M12 2L1 21h22L12 2zm1 14h-2v2h2v-2zm0-6h-2v4h2v-4z',
+
+  /** 加载 */
+  loader: 'M12 2a10 10 0 0 1 10 10h-2a8 8 0 0 0-8-8V2z',
+
+  /** 图片 */
+  image: 'M8.5 13.5l2.5 3 3.5-4.5 4.5 6H5m16 1V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2z',
+
+  /** 时间 (时钟) */
+  time: 'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zM11 7h2v5.6l4.2 2.5-1 1.6L11 13.6V7z',
+
+  /** 列表 */
+  sort: 'M3 5h12v2H3zm0 6h12v2H3zm0 6h12v2H3zm14-8l4 4-4 4V9z',
 } as const
 
 /** 图标名称类型 */
@@ -37,7 +73,7 @@ export type IconName = keyof typeof iconPaths
  * @returns Vue 函数式组件
  */
 export const createIcon = (pathData: string) => {
-  return () => h('svg', { viewBox: '0 0 24 24', fill: 'currentColor' }, [
+  return () => h('svg', { viewBox: '0 0 24 24', fill: 'currentColor', width: '1em', height: '1em' }, [
     h('path', { d: pathData })
   ])
 }
@@ -60,4 +96,10 @@ export const icons = {
   settings: createIcon(iconPaths.settings),
   help: createIcon(iconPaths.help),
   update: createIcon(iconPaths.update),
+  copy: createIcon(iconPaths.copy),
+  download: createIcon(iconPaths.download),
+  refresh: createIcon(iconPaths.refresh),
+  play: createIcon(iconPaths.play),
+  pause: createIcon(iconPaths.pause),
+  save: createIcon(iconPaths.save),
 } as const

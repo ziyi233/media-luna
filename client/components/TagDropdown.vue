@@ -5,7 +5,7 @@
       :class="{ active: isOpen || selectedTags.length > 0 }"
       @click="toggleDropdown"
     >
-      <span class="trigger-icon">🏷️</span>
+      <span class="trigger-icon"><k-icon name="tag" /></span>
       <span class="trigger-text">
         {{ selectedTags.length > 0 ? `标签 (${selectedTags.length})` : '标签' }}
       </span>

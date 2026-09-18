@@ -130,7 +130,7 @@ const finishSetup = async () => {
   background: var(--ml-bg, #fffbeb);
   z-index: 100;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
   overflow: auto;
   /* 隐藏式滚动条 */
@@ -161,8 +161,9 @@ const finishSetup = async () => {
 
 .wizard-container {
   width: 100%;
-  max-width: 640px;
+  max-width: 900px;
   padding: 2rem;
+  box-sizing: border-box;
 }
 
 .wizard-header {

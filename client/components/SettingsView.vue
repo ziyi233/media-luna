@@ -10,7 +10,7 @@
           :class="{ active: activePanel === panel.id }"
           @click="activePanel = panel.id"
         >
-          <span class="nav-emoji">{{ getPanelEmoji(panel.icon) }}</span>
+          <span class="nav-emoji"><k-icon :name="getPanelIcon(panel.icon)" /></span>
           <span>{{ panel.name }}</span>
         </div>
       </nav>
@@ -19,7 +19,7 @@
     <!-- 主内容区 -->
     <main class="main-content">
       <div v-if="loading" class="loading pop-card no-hover">
-        <span class="spin">🔄</span>
+        <span class="spin"><k-icon name="refresh" /></span>
         加载中...
       </div>
 
@@ -49,7 +49,7 @@
             />
             <div class="actions">
               <button class="pop-btn primary" @click="saveCustomConfig">
-                💾 保存
+                <k-icon name="check" /> 保存
               </button>
             </div>
           </div>
@@ -66,28 +66,28 @@ import ConfigRenderer from './ConfigRenderer.vue'
 import MiddlewaresPanel from './settings/MiddlewaresPanel.vue'
 import PluginsPanel from './settings/PluginsPanel.vue'
 
-// 图标映射
-const iconEmojiMap: Record<string, string> = {
-  'layers': '🧱',
-  'puzzle-piece': '🧩',
-  'cog': '⚙️',
-  'settings': '⚙️',
-  'sliders': '🎚️',
-  'paint-brush': '🎨',
-  'image': '🖼️',
-  'video': '🎬',
-  'music': '🎵',
-  'folder': '📁',
-  'file': '📄',
-  'database': '💾',
-  'cloud': '☁️',
-  'sync': '🔄',
-  'refresh': '🔄',
-  'default': '📋'
+// 图标命名映射（icon key -> k-icon 名称）
+const iconNameMap: Record<string, string> = {
+  'layers': 'layer-group',
+  'puzzle-piece': 'apps',
+  'cog': 'settings',
+  'settings': 'settings',
+  'sliders': 'settings',
+  'paint-brush': 'image',
+  'image': 'image',
+  'video': 'image',
+  'music': 'image',
+  'folder': 'file-archive',
+  'file': 'file-archive',
+  'database': 'file-archive',
+  'cloud': 'image',
+  'sync': 'refresh',
+  'refresh': 'refresh',
+  'default': 'tasks'
 }
 
-const getPanelEmoji = (icon: string) => {
-  return iconEmojiMap[icon] || iconEmojiMap['default']
+const getPanelIcon = (icon: string) => {
+  return iconNameMap[icon] || iconNameMap['default']
 }
 
 // 状态
@@ -182,31 +182,31 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 12px 16px;
+  padding: 10px 16px;
   border-radius: var(--ml-radius);
   cursor: pointer;
   color: var(--ml-text-muted);
   font-size: 14px;
   font-weight: 600;
-  border: 2px solid transparent;
-  transition: all 0.2s ease;
+  border: 1px solid transparent;
+  transition: all 0.15s ease;
 }
 
 .nav-item:hover {
-  background: var(--ml-cream);
+  background: var(--ml-bg-alt);
   color: var(--ml-text);
-  border-color: var(--ml-border-color);
 }
 
 .nav-item.active {
-  background: var(--ml-primary);
-  color: var(--ml-text);
-  border-color: var(--ml-border-color);
-  box-shadow: var(--ml-shadow-sm);
+  background: var(--ml-primary-light);
+  color: var(--ml-primary);
+  border-color: var(--ml-primary-light);
 }
 
 .nav-emoji {
-  font-size: 18px;
+  width: 18px;
+  height: 18px;
+  color: currentColor;
 }
 
 /* ============ 主内容区 ============ */
@@ -322,6 +322,6 @@ onMounted(async () => {
 .actions {
   margin-top: 24px;
   padding-top: 16px;
-  border-top: 2px solid var(--ml-border-color);
+  border-top: 1px solid var(--ml-border-color);
 }
 </style>

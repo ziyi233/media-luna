@@ -2,13 +2,13 @@
   <div class="plugins-panel">
     <!-- 加载状态 -->
     <div v-if="loading" class="loading-state pop-card no-hover">
-      <span class="spin">🔄</span>
+      <k-icon name="refresh" class="spin" />
       <span>加载中...</span>
     </div>
 
     <!-- 空状态 -->
     <div v-else-if="plugins.length === 0" class="empty-state pop-card no-hover">
-      <span class="empty-icon">🧩</span>
+      <k-icon name="apps" class="empty-icon" />
       <p>暂无扩展插件</p>
       <p class="hint">第三方扩展插件将在这里显示<br>内置功能请在"功能模块"中配置</p>
     </div>
@@ -31,12 +31,12 @@
             <p class="plugin-description">{{ plugin.description || '暂无描述' }}</p>
           </div>
           <div class="plugin-status">
-            <span v-if="plugin.connector" class="plugin-badge connector">🔗 连接器</span>
+            <span v-if="plugin.connector" class="plugin-badge connector"><k-icon name="link" /> 连接器</span>
             <span v-if="plugin.middlewares?.length" class="plugin-badge middleware">
-              🧱 {{ plugin.middlewares.length }} 个中间件
+              <k-icon name="layer-group" /> {{ plugin.middlewares.length }} 个中间件
             </span>
             <span :class="plugin.enabled ? 'status-enabled' : 'status-disabled'">
-              {{ plugin.enabled ? '✅' : '⛔' }}
+              <k-icon :name="plugin.enabled ? 'check' : 'times-full'" />
             </span>
           </div>
         </div>
@@ -64,7 +64,7 @@
 
         <!-- 连接器信息 -->
         <div v-if="selectedPlugin.connector" class="connector-info">
-          <h4>🔗 连接器</h4>
+          <h4><k-icon name="link" /> 连接器</h4>
           <div class="connector-meta">
             <span class="connector-id">{{ selectedPlugin.connector.id }}</span>
             <span class="connector-types">
@@ -75,7 +75,7 @@
 
         <!-- 中间件列表 -->
         <div v-if="selectedPlugin.middlewares?.length" class="middlewares-list">
-          <h4>🧱 中间件</h4>
+          <h4><k-icon name="layer-group" /> 中间件</h4>
           <div class="middleware-tags">
             <span
               v-for="mw in selectedPlugin.middlewares"
@@ -91,7 +91,7 @@
 
         <!-- 配置表单 -->
         <div v-if="selectedPlugin.configFields?.length" class="config-section">
-          <h4>⚙️ 配置</h4>
+          <h4><k-icon name="settings" /> 配置</h4>
           <ConfigRenderer
             :fields="selectedPlugin.configFields"
             v-model="pluginConfig"
@@ -99,21 +99,22 @@
           />
           <div class="config-actions">
             <button class="pop-btn primary" @click="saveConfig" :disabled="saving">
-              {{ saving ? '保存中...' : '💾 保存配置' }}
+              <template v-if="saving">保存中...</template>
+              <template v-else><k-icon name="save" /> 保存配置</template>
             </button>
           </div>
         </div>
 
         <!-- 无配置提示 -->
         <div v-else class="no-config">
-          <span class="no-config-icon">ℹ️</span>
+          <span class="no-config-icon"><k-icon name="info-full" /></span>
           <span>该插件暂无可配置项</span>
         </div>
       </div>
 
       <!-- 无选中提示 -->
       <div v-else class="no-selection pop-card no-hover">
-        <span class="no-selection-icon">🧩</span>
+        <k-icon name="apps" class="no-selection-icon" />
         <p>请从左侧选择一个插件查看详情</p>
       </div>
     </template>
@@ -310,7 +311,11 @@ onMounted(loadPlugins)
 }
 
 .plugin-card.active {
-  background: var(--ml-primary);
+  background: var(--ml-primary-light);
+}
+
+.plugin-card.active .plugin-name {
+  color: var(--ml-text);
 }
 
 .plugin-card.disabled {
@@ -371,11 +376,15 @@ onMounted(loadPlugins)
 }
 
 .plugin-badge.connector {
-  background: #dbeafe;
+  background: var(--ml-info-bg);
+  border-color: var(--ml-info-border);
+  color: var(--ml-info);
 }
 
 .plugin-badge.middleware {
-  background: #dcfce7;
+  background: var(--ml-success-bg);
+  border-color: var(--ml-success-border);
+  color: var(--ml-success);
 }
 
 .status-enabled,
@@ -500,9 +509,10 @@ onMounted(loadPlugins)
 .phase-badge {
   font-size: 10px;
   padding: 2px 6px;
-  background: var(--ml-primary);
+  background: var(--ml-primary-light);
   border-radius: 6px;
   font-weight: 700;
+  color: var(--ml-primary);
 }
 
 .config-actions {

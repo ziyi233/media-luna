@@ -164,7 +164,8 @@ export default definePlugin({
 
     // 等待 mediaLuna 服务就绪后注册指令
     ctx.on('ready', async () => {
-      mediaLunaRef = ctx.mediaLuna
+      // 通过 media-luna 服务注册表获取，避免直接访问 Koishi ctx.mediaLuna 触发 inject 警告
+      mediaLunaRef = pluginCtx.getService<any>('mediaLuna')
       await refreshGenerateCommands()
       // 预设查询指令使用全局配置
       if (mediaLunaRef.isPluginEnabledForChannel('koishi-commands', null)) {

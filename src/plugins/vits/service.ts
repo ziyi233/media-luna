@@ -25,6 +25,16 @@ export class MediaLunaVits extends Vits {
     public config: VitsPluginConfig
   ) {
     super(ctx)
+
+    // 将自身注册到 media-luna 服务注册表，供子插件通过 getService('vits') 访问
+    // 并自管理 speaker 刷新，避免由外层插件直接访问 Koishi ctx.vits 触发 inject 警告
+    this.ctx.on('ready', () => {
+      const mediaLuna = this.ctx.mediaLuna as any
+      if (mediaLuna?.registerPluginService) {
+        mediaLuna.registerPluginService('vits', this)
+      }
+      this.refreshSpeakers()
+    })
   }
 
   /**

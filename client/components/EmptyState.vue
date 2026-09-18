@@ -32,18 +32,18 @@ const sizeClass = computed(() => `size-${props.size}`)
 </script>
 
 <style scoped>
-/* 空状态 - 波普风格 */
+/* 空状态 - Obsidian 观感 */
 .empty-state {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 10px;
-  color: var(--ml-text-secondary, #92400e);
+  color: var(--ml-text-secondary);
   text-align: center;
-  background: var(--ml-bg-alt, #fef3c7);
-  border: 2px dashed var(--ml-border-color, #451a03);
-  border-radius: var(--ml-radius, 12px);
+  background: transparent;
+  border: 1px dashed var(--ml-border-color);
+  border-radius: var(--ml-radius);
 }
 
 .empty-state.size-small {
@@ -73,22 +73,22 @@ const sizeClass = computed(() => `size-${props.size}`)
 .empty-icon {
   opacity: 0.6;
   margin-bottom: 4px;
-  color: var(--ml-text-muted, #92400e);
+  color: var(--ml-text-muted);
 }
 
 .empty-title {
   margin: 0;
   font-size: 14px;
-  font-weight: 700;
-  color: var(--ml-text, #451a03);
+  font-weight: 600;
+  color: var(--ml-text);
 }
 
 .empty-description {
   margin: 0;
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 500;
   opacity: 0.85;
   max-width: 300px;
-  line-height: 1.5;
+  line-height: 1.6;
 }
 </style>

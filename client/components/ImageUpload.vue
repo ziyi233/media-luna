@@ -6,7 +6,7 @@
         <div class="image-preview">
           <img v-if="img.mime.startsWith('image/')" :src="img.previewUrl" :alt="img.filename" />
           <video v-else-if="img.mime.startsWith('video/')" :src="img.previewUrl" class="video-preview"></video>
-          <div v-else class="unknown-file">❓</div>
+          <div v-else class="unknown-file"><k-icon name="question-empty" /></div>
           <div class="image-overlay">
             <k-button size="mini" class="remove-btn" @click.stop="removeImage(index)">
               <template #icon><k-icon name="delete"></k-icon></template>

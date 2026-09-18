@@ -11,7 +11,7 @@
             @click="viewMode = 'list'"
             title="列表视图"
           >
-            📋
+            <k-icon name="tasks" />
           </button>
           <button
             class="group-btn"
@@ -19,13 +19,13 @@
             @click="viewMode = 'card'"
             title="卡片视图"
           >
-            🎴
+            <k-icon name="image" />
           </button>
         </div>
         <div class="filter-divider"></div>
         <!-- 搜索框 -->
         <div class="search-box">
-          <span class="search-icon">🔍</span>
+          <k-icon name="search" class="search-icon" />
           <input
             v-model="searchQuery"
             class="pop-input small search-input"
@@ -36,7 +36,7 @@
             class="search-clear"
             @click="searchQuery = ''"
             title="清除搜索"
-          >✕</button>
+          ><k-icon name="close" /></button>
         </div>
         <div class="filter-divider"></div>
         <select v-model="filter.source" class="pop-select small">
@@ -61,28 +61,28 @@
             :disabled="selectedIds.size === 0"
             @click="batchToggle(true)"
             title="批量启用"
-          >✅ 启用</button>
+          ><k-icon name="check" /> 启用</button>
           <button
             class="pop-btn small"
             :disabled="selectedIds.size === 0"
             @click="batchToggle(false)"
             title="批量禁用"
-          >⛔ 禁用</button>
+          ><k-icon name="times-full" /> 禁用</button>
           <button
             class="pop-btn small danger"
             :disabled="selectedIds.size === 0 || !canBatchDelete"
             @click="batchDelete"
             title="批量删除（仅本地预设）"
-          >🗑️ 删除</button>
+          ><k-icon name="delete" /> 删除</button>
           <div class="filter-divider"></div>
           <button class="pop-btn small" @click="exitBatchMode">取消</button>
         </template>
         <!-- 常规模式 -->
         <template v-else>
-          <button class="pop-btn small" @click="enterBatchMode" title="批量管理">📦 批量</button>
-          <button class="pop-btn small" @click="fetchData" title="刷新">🔄</button>
+          <button class="pop-btn small" @click="enterBatchMode" title="批量管理"><k-icon name="presets" /> 批量</button>
+          <button class="pop-btn small" @click="fetchData" title="刷新"><k-icon name="refresh" /></button>
           <button class="pop-btn small primary" @click="openCreateDialog">
-            ➕ 新建
+            <k-icon name="add" /> 新建
           </button>
         </template>
       </div>
@@ -132,7 +132,7 @@
                 <td>
                   <div class="thumb-cell">
                     <img v-if="row.thumbnail" :src="row.thumbnail" class="thumb-img" />
-                    <div v-else class="thumb-empty">🖼️</div>
+                    <div v-else class="thumb-empty"><k-icon name="image" /></div>
                   </div>
                 </td>
                 <td>
@@ -166,7 +166,7 @@
                     class="action-btn upload"
                     title="上传到云端"
                     @click.stop="handleUpload(row)"
-                  >☁️</span>
+                  ><k-icon name="image" /></span>
                 </td>
                 <td style="text-align: center">
                   <span
@@ -174,7 +174,7 @@
                     class="action-btn delete"
                     title="删除"
                     @click.stop="handleDelete(row)"
-                  >🗑️</span>
+                  ><k-icon name="delete" /></span>
                 </td>
               </tr>
             </tbody>
@@ -185,7 +185,7 @@
       <!-- 卡片视图 -->
       <template v-else-if="viewMode === 'card'">
         <div v-if="displayPresets.length === 0" class="empty-view">
-          <span class="empty-icon">📦</span>
+          <k-icon name="presets" class="empty-icon" />
           <p>暂无预设</p>
         </div>
         <MasonryGrid
@@ -222,23 +222,23 @@
                       <input type="checkbox" v-model="preset.enabled" @change="handleToggle(preset)" />
                       <span class="toggle-slider"></span>
                     </label>
-                    <button class="overlay-btn" title="复制为新预设" @click="handleCopy(preset)">📋</button>
+                    <button class="overlay-btn" title="复制为新预设" @click="handleCopy(preset)"><k-icon name="tasks" /></button>
                     <button
                       v-if="preset.source === 'user'"
                       class="overlay-btn danger"
                       title="删除"
                       @click="handleDelete(preset)"
-                    >🗑️</button>
-                    <button class="overlay-btn upload" v-if="preset.source === 'user'" title="上传到云端" @click="handleUpload(preset)">☁️</button>
+                    ><k-icon name="delete" /></button>
+                    <button class="overlay-btn upload" v-if="preset.source === 'user'" title="上传到云端" @click="handleUpload(preset)"><k-icon name="image" /></button>
                   </div>
                 </div>
                 <!-- 参考图数量 -->
                 <span v-if="preset.referenceImages?.length" class="ref-badge">
-                  🖼️ {{ preset.referenceImages.length }}
+                  <k-icon name="image" /> {{ preset.referenceImages.length }}
                 </span>
               </div>
               <div class="card-thumb empty" v-else>
-                <span class="empty-thumb-icon">🖼️</span>
+                <k-icon name="image" class="empty-thumb-icon" />
                 <!-- 悬浮时显示的中央操作区 -->
                 <div class="thumb-overlay">
                   <div class="overlay-controls" @click.stop>
@@ -246,13 +246,13 @@
                       <input type="checkbox" v-model="preset.enabled" @change="handleToggle(preset)" />
                       <span class="toggle-slider"></span>
                     </label>
-                    <button class="overlay-btn" title="复制为新预设" @click="handleCopy(preset)">📋</button>
+                    <button class="overlay-btn" title="复制为新预设" @click="handleCopy(preset)"><k-icon name="tasks" /></button>
                     <button
                       v-if="preset.source === 'user'"
                       class="overlay-btn danger"
                       title="删除"
                       @click="handleDelete(preset)"
-                    >🗑️</button>
+                    ><k-icon name="delete" /></button>
                   </div>
                 </div>
               </div>
@@ -288,9 +288,9 @@
         <span class="page-size-label">条</span>
       </div>
       <div class="page-nav">
-        <button class="pop-btn small" :disabled="page <= 1" @click="page--">⬅️</button>
+        <button class="pop-btn small" :disabled="page <= 1" @click="page--"><k-icon name="chevron-left" /></button>
         <span class="page-info">{{ page }} / {{ totalPages }}</span>
-        <button class="pop-btn small" :disabled="page >= totalPages" @click="page++">➡️</button>
+        <button class="pop-btn small" :disabled="page >= totalPages" @click="page++"><k-icon name="chevron-right" /></button>
       </div>
       <div class="page-total">共 {{ filteredPresets.length }} 条</div>
     </div>
@@ -301,7 +301,7 @@
         <div class="modal-dialog pop-card no-hover">
           <div class="modal-header">
             <h3>{{ isEdit ? '编辑预设' : '新建预设' }}</h3>
-            <button class="modal-close" @click="dialogVisible = false">✕</button>
+            <button class="modal-close" @click="dialogVisible = false"><k-icon name="close" /></button>
           </div>
           <div class="modal-body pop-scrollbar">
             <div class="form-group">
@@ -902,8 +902,7 @@ onMounted(fetchData)
 
 .group-btn.active {
   color: var(--ml-text);
-  background: var(--ml-primary);
-  box-shadow: var(--ml-shadow-sm);
+  background: var(--ml-primary-soft, var(--ml-primary-light));
 }
 
 /* ============ 内容区域 ============ */
@@ -1338,31 +1337,32 @@ onMounted(fetchData)
   right: 0;
   bottom: 0;
   background-color: var(--ml-bg-alt);
-  border: 2px solid var(--ml-border-color);
+  border: none;
   border-radius: 24px;
+  box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.08);
   transition: 0.2s;
 }
 
 .toggle-slider::before {
   position: absolute;
   content: "";
-  height: 16px;
-  width: 16px;
-  left: 2px;
-  bottom: 2px;
-  background-color: var(--ml-border-color);
+  height: 18px;
+  width: 18px;
+  left: 3px;
+  bottom: 3px;
+  background-color: #ffffff;
+  border: none;
   border-radius: 50%;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
   transition: 0.2s;
 }
 
 .toggle-switch input:checked + .toggle-slider {
   background-color: var(--ml-success);
-  border-color: var(--ml-success-dark);
 }
 
 .toggle-switch input:checked + .toggle-slider::before {
   transform: translateX(20px);
-  background-color: white;
 }
 
 /* ============ 模态框 ============ */

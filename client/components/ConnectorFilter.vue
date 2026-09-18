@@ -20,7 +20,7 @@
             <template v-for="group in connectorGroups" :key="group.type">
               <div class="group-section" v-if="group.connectors.length > 0">
                 <div class="group-header">
-                  <span class="group-icon">{{ group.icon }}</span>
+                  <span class="group-icon"><k-icon :name="group.icon" /></span>
                   <span class="group-title">{{ group.title }}</span>
                 </div>
                 <div class="group-items">
@@ -84,9 +84,9 @@ const selectedConnectors = computed({
 // 按媒体类型分组连接器
 const connectorGroups = computed(() => {
   const groups = [
-    { type: 'image', title: '图像', icon: '🖼️', connectors: [] as any[] },
-    { type: 'audio', title: '音频', icon: '🔊', connectors: [] as any[] },
-    { type: 'video', title: '视频', icon: '🎬', connectors: [] as any[] }
+    { type: 'image', title: '图像', icon: 'image', connectors: [] as any[] },
+    { type: 'audio', title: '音频', icon: 'image', connectors: [] as any[] },
+    { type: 'video', title: '视频', icon: 'image', connectors: [] as any[] }
   ]
 
   for (const connector of props.connectors) {

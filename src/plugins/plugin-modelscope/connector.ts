@@ -156,14 +156,15 @@ async function generate(
   }
 
   // 处理图片输入（如果启用且有图片）
+  // ModelScope 参考图字段为 image_url（数组），单个字符串的 image 字段会被静默忽略
   if (enableImageInput && files.length > 0) {
-    // 只取第一张图片作为参考图
-    const imageFile = files.find(f => f.mime.startsWith('image/'))
-    if (imageFile && imageFile.data) {
-      // 将图片数据转为 base64 格式
-      const base64 = Buffer.from(imageFile.data).toString('base64')
-      requestBody.image = `data:${imageFile.mime};base64,${base64}`
-      ctx.logger('media-luna').debug('[ModelScope] Image input enabled, added reference image')
+    const imageFiles = files.filter(f => f.mime?.startsWith('image/') && f.data)
+    if (imageFiles.length > 0) {
+      requestBody.image_url = imageFiles.map(f => {
+        const base64 = Buffer.from(f.data).toString('base64')
+        return `data:${f.mime};base64,${base64}`
+      })
+      ctx.logger('media-luna').debug('[ModelScope] Image input enabled, added %d reference image(s)', imageFiles.length)
     }
   }
 

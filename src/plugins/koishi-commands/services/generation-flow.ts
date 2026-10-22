@@ -63,6 +63,17 @@ export async function executeGenerate(
   let generatingMsgIds: string[] | undefined
 
   try {
+    // 生成前置守卫（生成前确认等）：命令层在真正出图前询问，返回文案即中止本次生成
+    const blocked = await mediaLuna.runGenerateGuards?.({
+      channel: options.channelName,
+      prompt: options.prompt,
+      files: options.files,
+      parameters: options.parameters,
+      session,
+      uid
+    })
+    if (blocked) return blocked
+
     const result: GenerationResult = await mediaLuna.generateByName({
       channelName: options.channelName,
       presetName: options.presetName,

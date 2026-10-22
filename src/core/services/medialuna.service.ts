@@ -9,6 +9,7 @@ import type {
 } from '../types'
 import type {
   FrontendExtension,
+  GenerateGuard,
   GenerationRequest,
   GenerationResult,
   ChannelConfig,
@@ -67,6 +68,8 @@ export class MediaLunaService extends Service {
   private _frontendExtensions: Map<string, FrontendExtension> = new Map()
   private _settingsPanels: Map<string, SettingsPanelDefinition> = new Map()
   private _pipeline: GenerationPipeline
+  /** 生成前置守卫（生成前确认等能力用；见 registerGenerateGuard） */
+  private _generateGuards: GenerateGuard[] = []
 
   // 业务服务
   private _channelService: ChannelService
@@ -105,6 +108,8 @@ export class MediaLunaService extends Service {
     // 初始化核心配置和服务注册中心
     this._configService = new ConfigService(ctx, { configDir: 'media-luna' })
     this._serviceRegistry = new ServiceRegistry(ctx)
+    // 注册自身服务，便于子插件通过 getService('mediaLuna') 访问（避免直接访问 Koishi ctx 触发 inject 警告）
+    this._serviceRegistry.register('mediaLuna', this)
     this._connectorRegistry = new ConnectorRegistry(ctx)
     this._middlewareRegistry = new MiddlewareRegistry(ctx)
 
@@ -193,6 +198,15 @@ export class MediaLunaService extends Service {
   async waitForReady(): Promise<void> {
     if (this._ready) return
     return this._readyPromise
+  }
+
+  /**
+   * 注册插件级服务到 media-luna 服务注册表
+   * 供其他子插件通过 pluginCtx.getService(name) 访问，
+   * 避免直接访问 Koishi ctx.<service> 触发 inject 警告。
+   */
+  registerPluginService<T>(name: string, service: T): () => void {
+    return this._serviceRegistry.register(name, service)
   }
 
   // ============ 默认配置 ============
@@ -357,6 +371,27 @@ export class MediaLunaService extends Service {
   async generate(request: GenerationRequest): Promise<GenerationResult> {
     this._logger.debug(`Generating with channel: ${request.channel}`)
     return this._pipeline.execute(request)
+  }
+
+  /**
+   * 注册生成前置守卫：命令层在真正调用生成前依次询问，返回非 null 文案即中止本次生成。
+   * 「生成前确认」这类需要在出图前先跟用户对话的能力用它，避免在管道里用 STOP（那样交付层会补一句“生成完成，但没有输出”）。
+   */
+  registerGenerateGuard(guard: GenerateGuard): () => void {
+    this._generateGuards.push(guard)
+    return () => {
+      const index = this._generateGuards.indexOf(guard)
+      if (index >= 0) this._generateGuards.splice(index, 1)
+    }
+  }
+
+  /** 依次询问守卫；第一个返回文案的守卫中止生成，其余守卫不再询问 */
+  async runGenerateGuards(request: GenerationRequest): Promise<string | null> {
+    for (const guard of [...this._generateGuards]) {
+      const blocked = await guard(request)
+      if (blocked) return blocked
+    }
+    return null
   }
 
   // ============ 查询 API ============

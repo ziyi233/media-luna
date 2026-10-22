@@ -43,6 +43,7 @@ import openaiTTSConnectorPlugin from './connector-openai-tts'
 import azureTTSConnectorPlugin from './connector-azure-tts'
 import volcengineTTSConnectorPlugin from './connector-volcengine-tts'
 import peintureConnectorPlugin from './connector-peinture'
+import novelAIConnectorPlugin from './connector-novelai'
 import { modelscopePlugin } from './plugin-modelscope'
 
 /** 内置插件列表 - 只需在这里维护一次 */
@@ -87,6 +88,7 @@ export const builtinPlugins: PluginDefinition[] = [
   azureTTSConnectorPlugin,
   volcengineTTSConnectorPlugin,
   peintureConnectorPlugin,
+  novelAIConnectorPlugin,
   modelscopePlugin
 ]
 
@@ -130,10 +132,13 @@ export {
   azureTTSConnectorPlugin,
   volcengineTTSConnectorPlugin,
   peintureConnectorPlugin,
+  novelAIConnectorPlugin,
   modelscopePlugin
 }
 
 // 导出类型
+export type { NovelAIParams, NovelAICharacterRow, AnlasBreakdown } from './connector-novelai'
+export type { NovelAIModelProfile, ReferenceMode } from './connector-novelai'
 export type { StorageConfig, LocalCacheConfig } from './cache'
 export type { PresetPluginConfig, PresetMiddlewareConfig, RemoteSyncConfig } from './preset'
 export type { BillingConfig } from './billing'

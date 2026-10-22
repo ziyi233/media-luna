@@ -2,6 +2,16 @@
 
 import type { ConfigField } from '../../types'
 
+/** 命令选项覆盖：改字母、改类型或整条禁用 */
+export interface CommandOptionOverride {
+  /** 连接器 id，如 novelai、comfyui */
+  connector: string
+  /** 选项 key，如 steps、character、negativePrompt */
+  option: string
+  /** 该选项的完整声明，如 `-t <steps:number> 步数`；留空＝用内置默认；填 - 或 none ＝不注册该选项 */
+  flags: string
+}
+
 /** Koishi 聊天指令插件配置 */
 export interface KoishiCommandsConfig {
   /** 是否启用指令注册 */
@@ -24,6 +34,8 @@ export interface KoishiCommandsConfig {
   useNapCatFileApi: boolean
   /** 是否显示该渠道上次成功生成的时间 */
   showLastSuccessTime: boolean
+  /** 命令选项覆盖（可改字母/类型，或禁用某个选项） */
+  optionAliases: CommandOptionOverride[]
 }
 
 /** 默认配置 */
@@ -37,11 +49,60 @@ export const defaultKoishiCommandsConfig: KoishiCommandsConfig = {
   linkModeExcludePlatforms: '',
   outputTextContent: false,
   useNapCatFileApi: false,
-  showLastSuccessTime: false
+  showLastSuccessTime: false,
+  optionAliases: []
 }
 
 /** 配置字段定义 */
 export const koishiCommandsConfigFields: ConfigField[] = [
+  {
+    key: 'optionAliases',
+    label: '命令选项覆盖',
+    type: 'table',
+    default: [],
+    columns: [
+      {
+        key: 'connector',
+        label: '连接器',
+        type: 'select',
+        width: '120px',
+        options: [
+          { label: 'NovelAI', value: 'novelai' },
+          { label: 'ComfyUI', value: 'comfyui' }
+        ]
+      },
+      {
+        key: 'option',
+        label: '选项',
+        type: 'select',
+        width: '160px',
+        options: [
+          { label: 'steps', value: 'steps' },
+          { label: 'scale / cfg', value: 'scale' },
+          { label: 'sampler', value: 'sampler' },
+          { label: 'seed', value: 'seed' },
+          { label: 'cfgRescale', value: 'cfgRescale' },
+          { label: 'referenceStrength', value: 'referenceStrength' },
+          { label: 'character', value: 'character' },
+          { label: 'negativePrompt', value: 'negativePrompt' },
+          { label: 'resolution', value: 'resolution' },
+          { label: 'denoise', value: 'denoise' },
+          { label: 'framerate', value: 'framerate' },
+          { label: 'time', value: 'time' },
+          { label: 'motion', value: 'motion' }
+        ]
+      },
+      {
+        key: 'flags',
+        label: '完整声明',
+        type: 'text',
+        placeholder: '-t <steps:number> 步数',
+        width: '320px'
+      }
+    ],
+    tableConfig: { enableImport: true, enableExport: true, enableBatchDelete: true, enableSelection: true },
+    description: '改字母/改类型/禁用某个选项。flags 留空＝用内置默认；填 - 或 none ＝不注册该选项。注意 text 类型（默认的负面词）会吃掉行尾，必须放在提示词最后'
+  },
   {
     key: 'enabled',
     label: '启用指令',

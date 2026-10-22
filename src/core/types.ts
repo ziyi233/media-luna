@@ -337,6 +337,12 @@ export interface GenerationRequest {
   onPrepareComplete?: (hints: string[]) => Promise<void>
 }
 
+/**
+ * 生成前置守卫：命令层在真正调用生成前依次询问，返回非 null 文案即中止本次生成。
+ * 「生成前确认」这类需要在出图前先跟用户对话的能力用它。
+ */
+export type GenerateGuard = (request: GenerationRequest) => Promise<string | null>
+
 /** 生成结果 */
 export interface GenerationResult {
   success: boolean

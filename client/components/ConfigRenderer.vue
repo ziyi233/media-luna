@@ -564,16 +564,15 @@ const getGroupedOptions = (field: ConfigField): OptionGroup[] => {
   flex-direction: column;
   gap: 0.25rem;
   position: relative;
+  width: 100%;
+  min-width: 0;
 }
 
 .form-row {
   display: flex;
   align-items: flex-start;
-  margin-bottom: 1.25rem;
-  transition: background-color 0.3s;
-  padding: 0.5rem;
-  margin: -0.5rem;
   margin-bottom: 0.75rem;
+  padding: 0.5rem;
   border-radius: var(--ml-radius-sm, 8px);
 }
 
@@ -598,6 +597,7 @@ const getGroupedOptions = (field: ConfigField): OptionGroup[] => {
 
 .field-container {
   flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 0.25rem;

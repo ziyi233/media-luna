@@ -11,7 +11,7 @@
           <div class="dialog-header">
             <span class="dialog-title">{{ isEdit ? '编辑渠道' : '创建渠道' }}</span>
             <button class="close-btn" @click="visible = false">
-              <k-icon name="x" />
+              <k-icon name="close" />
             </button>
           </div>
 
@@ -927,8 +927,7 @@ watch(() => props.modelValue, async (newVal) => {
 .overlay {
   position: absolute;
   inset: 0;
-  background: rgba(255, 251, 235, 0.7);
-  backdrop-filter: blur(8px);
+  background: rgba(15, 17, 22, 0.55);
 }
 
 /* ============ 主对话框 ============ */
@@ -952,7 +951,7 @@ watch(() => props.modelValue, async (newVal) => {
   justify-content: space-between;
   padding: 16px 20px;
   border-bottom: var(--ml-border, 3px solid #451a03);
-  background: var(--ml-primary-light, #fde68a);
+  background: transparent;
 }
 
 .dialog-title {
@@ -965,26 +964,23 @@ watch(() => props.modelValue, async (newVal) => {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
-  border: 2px solid var(--ml-border-color, #451a03);
-  background: var(--ml-surface, #ffffff);
-  border-radius: var(--ml-radius-sm, 8px);
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  border-radius: var(--ml-radius-sm, 6px);
   cursor: pointer;
-  color: var(--ml-text, #451a03);
-  transition: all 0.1s ease;
-  box-shadow: 2px 2px 0 var(--ml-border-color, #451a03);
+  color: var(--ml-text-muted);
+  transition: background-color 0.15s, color 0.15s, transform 0.1s;
 }
 
 .close-btn:hover {
-  background: var(--ml-error-bg, #fee2e2);
-  transform: translate(-1px, -1px);
-  box-shadow: 3px 3px 0 var(--ml-border-color, #451a03);
+  background: var(--ml-bg-alt);
+  color: var(--ml-text);
 }
 
 .close-btn:active {
-  transform: translate(1px, 1px);
-  box-shadow: 1px 1px 0 var(--ml-border-color, #451a03);
+  transform: scale(0.94);
 }
 
 .dialog-layout {
@@ -1294,11 +1290,11 @@ watch(() => props.modelValue, async (newVal) => {
   border: 2px solid;
 }
 
-.phase-prepare .phase-icon { background: #dbeafe; color: #3b82f6; border-color: #3b82f6; }
-.phase-pre .phase-icon { background: #ede9fe; color: #8b5cf6; border-color: #8b5cf6; }
-.phase-request .phase-icon { background: #dcfce7; color: #22c55e; border-color: #22c55e; }
-.phase-post .phase-icon { background: #ffedd5; color: #f97316; border-color: #f97316; }
-.phase-finalize .phase-icon { background: #e0e7ff; color: #6366f1; border-color: #6366f1; }
+.phase-prepare .phase-icon { background: var(--ml-info-bg); color: var(--ml-info); border-color: var(--ml-info-border); }
+.phase-pre .phase-icon { background: var(--ml-primary-light); color: var(--ml-primary); border-color: var(--ml-primary); }
+.phase-request .phase-icon { background: var(--ml-success-bg); color: var(--ml-success); border-color: var(--ml-success-border); }
+.phase-post .phase-icon { background: var(--ml-warning-bg); color: var(--ml-warning); border-color: var(--ml-warning-border); }
+.phase-finalize .phase-icon { background: var(--ml-info-bg); color: var(--ml-info); border-color: var(--ml-info-border); }
 
 .phase-info {
   flex: 1;
@@ -1323,7 +1319,6 @@ watch(() => props.modelValue, async (newVal) => {
   height: 24px;
   padding: 0 8px;
   background: var(--ml-bg-alt, #fef3c7);
-  border: 2px solid var(--ml-border-color, #451a03);
   border-radius: 12px;
   font-size: 12px;
   font-weight: 800;
@@ -1578,7 +1573,7 @@ watch(() => props.modelValue, async (newVal) => {
   gap: 10px;
   padding: 16px 20px;
   border-bottom: var(--ml-border, 3px solid #451a03);
-  background: var(--ml-primary-light, #fde68a);
+  background: transparent;
   font-size: 15px;
   font-weight: 800;
   color: var(--ml-text, #451a03);
@@ -1763,18 +1758,18 @@ watch(() => props.modelValue, async (newVal) => {
 }
 
 .card-logo.logo-image {
-  background: #dcfce7;
-  border-color: #10b981;
+  background: var(--ml-success-bg);
+  border-color: var(--ml-success-border);
 }
 
 .card-logo.logo-audio {
-  background: #ede9fe;
-  border-color: #8b5cf6;
+  background: var(--ml-primary-light);
+  border-color: var(--ml-primary);
 }
 
 .card-logo.logo-video {
-  background: #ffedd5;
-  border-color: #f59e0b;
+  background: var(--ml-warning-bg);
+  border-color: var(--ml-warning-border);
 }
 
 .logo-svg {
@@ -1798,15 +1793,15 @@ watch(() => props.modelValue, async (newVal) => {
 }
 
 .logo-image .logo-icon {
-  color: #10b981;
+  color: var(--ml-success);
 }
 
 .logo-audio .logo-icon {
-  color: #8b5cf6;
+  color: var(--ml-primary);
 }
 
 .logo-video .logo-icon {
-  color: #f59e0b;
+  color: var(--ml-warning);
 }
 
 /* 信息 */
@@ -1849,15 +1844,15 @@ watch(() => props.modelValue, async (newVal) => {
 }
 
 .type-dot.image {
-  background: #10b981;
+  background: var(--ml-success);
 }
 
 .type-dot.audio {
-  background: #8b5cf6;
+  background: var(--ml-primary);
 }
 
 .type-dot.video {
-  background: #f59e0b;
+  background: var(--ml-warning);
 }
 
 /* 空状态 */

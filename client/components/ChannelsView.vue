@@ -11,7 +11,7 @@
             @click="viewMode = 'list'"
             title="列表视图"
           >
-            📋
+            <k-icon name="tasks" />
           </button>
           <button
             class="group-btn"
@@ -19,13 +19,13 @@
             @click="viewMode = 'card'"
             title="卡片视图"
           >
-            🎴
+            <k-icon name="image" />
           </button>
         </div>
         <div class="filter-divider"></div>
         <!-- 搜索框 -->
         <div class="search-box">
-          <span class="search-icon">🔍</span>
+          <k-icon name="search" class="search-icon" />
           <input
             v-model="searchQuery"
             class="pop-input small search-input"
@@ -36,7 +36,7 @@
             class="search-clear"
             @click="searchQuery = ''"
             title="清除搜索"
-          >✕</button>
+          ><k-icon name="close" /></button>
         </div>
         <div class="filter-divider"></div>
         <ConnectorFilter
@@ -54,9 +54,9 @@
       </div>
       <!-- 右侧：操作按钮 -->
       <div class="toolbar-right">
-        <button class="pop-btn small" @click="fetchData" title="刷新">🔄</button>
+        <button class="pop-btn small" @click="fetchData" title="刷新"><k-icon name="refresh" /></button>
         <button class="pop-btn small primary" @click="openCreateDialog">
-          ➕ 新建
+          <k-icon name="add" /> 新建
         </button>
       </div>
     </div>
@@ -81,7 +81,7 @@
                   :src="getConnectorIconUrl(channel.connectorId)"
                   :alt="getConnectorName(channel.connectorId)"
                 />
-                <span v-else>🔗</span>
+                <span v-else><k-icon name="link" /></span>
               </div>
               <div class="channel-info">
                 <div class="channel-name">{{ channel.name }}</div>
@@ -99,7 +99,7 @@
               title="点击复制 Speaker ID"
               @click.stop="copySpeakerId(channel.id)"
             >
-              🎤 {{ getSpeakerId(channel.id) }}
+              <k-icon name="user" /> {{ getSpeakerId(channel.id) }}
             </span>
             <!-- 中间件字段（如费用）显示在标题旁 -->
             <template v-for="field in middlewareCardFields" :key="`mw-${field.key}`">
@@ -127,18 +127,18 @@
 
         <div class="card-footer" @click.stop>
           <button class="pop-btn small" @click="copyChannel(channel)">
-            📋 复制
+            <k-icon name="tasks" /> 复制
           </button>
           <div class="spacer"></div>
           <button class="pop-btn small danger" @click="confirmDelete(channel)">
-            🗑️ 删除
+            <k-icon name="delete" /> 删除
           </button>
         </div>
       </div>
 
       <!-- 空状态 -->
       <div v-if="filteredChannels.length === 0 && !loading" class="empty-state">
-        <div class="empty-icon">📭</div>
+        <div class="empty-icon"><k-icon name="inbox" /></div>
         <div class="empty-text" v-if="channels.length === 0">还没有创建任何渠道</div>
         <div class="empty-text" v-else>没有找到匹配的渠道</div>
         <button v-if="channels.length === 0" class="pop-btn primary" @click="openCreateDialog">
@@ -205,10 +205,10 @@
               <td class="col-actions" @click.stop>
                 <div class="action-btns">
                   <button class="pop-btn small" @click="copyChannel(channel)">
-                    📋 复制
+                    <k-icon name="tasks" /> 复制
                   </button>
                   <button class="pop-btn small danger" @click="confirmDelete(channel)">
-                    🗑️ 删除
+                    <k-icon name="delete" /> 删除
                   </button>
                 </div>
               </td>
@@ -230,6 +230,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { ChannelConfig, ConfigField, ConnectorDefinition, CardField } from '../types'
 import { channelApi, connectorApi, middlewareApi } from '../api'
+import { copyToClipboard } from '../utils/clipboard'
 import TagDropdown from './TagDropdown.vue'
 import ConnectorFilter from './ConnectorFilter.vue'
 import SortSelect, { type SortValue } from './SortSelect.vue'
@@ -488,28 +489,9 @@ const copySpeakerId = async (channelId: number) => {
   const speakerId = getSpeakerId(channelId)
   const text = String(speakerId)
 
-  try {
-    // 尝试使用现代 Clipboard API
-    if (navigator.clipboard && window.isSecureContext) {
-      await navigator.clipboard.writeText(text)
-    } else {
-      // Fallback: 使用传统方法
-      const textArea = document.createElement('textarea')
-      textArea.value = text
-      textArea.style.position = 'fixed'
-      textArea.style.left = '-9999px'
-      textArea.style.top = '-9999px'
-      document.body.appendChild(textArea)
-      textArea.focus()
-      textArea.select()
-      document.execCommand('copy')
-      document.body.removeChild(textArea)
-    }
-    alert(`已复制 Speaker ID: ${speakerId}`)
-  } catch (e) {
-    console.error('Failed to copy:', e)
-    alert('复制失败')
-  }
+  const ok = await copyToClipboard(text)
+  if (ok) alert(`已复制 Speaker ID: ${speakerId}`)
+  else alert('复制失败')
 }
 
 const fetchData = async () => {
@@ -703,8 +685,7 @@ onMounted(() => {
 
 .group-btn.active {
   color: var(--ml-text);
-  background: var(--ml-primary);
-  box-shadow: var(--ml-shadow-sm);
+  background: var(--ml-primary-soft, var(--ml-primary-light));
 }
 
 /* ========== 搜索框样式 ========== */
@@ -966,27 +947,29 @@ onMounted(() => {
   right: 0;
   bottom: 0;
   background-color: var(--ml-bg-alt);
-  border: 2px solid var(--ml-border-color);
+  border: none;
   border-radius: 24px;
+  box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.08);
   transition: all 0.2s;
 }
 
 .toggle-slider::before {
   position: absolute;
   content: "";
-  height: 16px;
-  width: 16px;
-  left: 2px;
-  bottom: 2px;
-  background-color: var(--ml-surface);
-  border: 2px solid var(--ml-border-color);
+  height: 18px;
+  width: 18px;
+  left: 3px;
+  bottom: 3px;
+  background-color: #ffffff;
+  border: none;
   border-radius: 50%;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
   transition: all 0.2s;
 }
 
 .toggle-switch.small .toggle-slider::before {
-  height: 12px;
-  width: 12px;
+  height: 14px;
+  width: 14px;
 }
 
 .toggle-switch input:checked + .toggle-slider {

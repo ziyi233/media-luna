@@ -23,36 +23,39 @@ const label = computed(() => {
 </script>
 
 <style scoped>
-/* 状态徽章 - 波普风格 */
+/* 状态徽章 - Obsidian 观感 */
 .status-badge {
   display: inline-flex;
   align-items: center;
   padding: 3px 10px;
-  border-radius: var(--ml-radius-sm, 8px);
+  border-radius: 999px;
   font-size: 0.75rem;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.2;
-  border: 2px solid var(--ml-border-color, #451a03);
-  box-shadow: 1px 1px 0 var(--ml-border-color, #451a03);
+  border: 1px solid transparent;
 }
 
 .status-badge.pending {
-  background-color: var(--ml-bg-alt, #fef3c7);
-  color: var(--ml-text-secondary, #92400e);
+  background-color: var(--ml-bg-alt);
+  border-color: var(--ml-border-color);
+  color: var(--ml-text-secondary);
 }
 
 .status-badge.processing {
-  background-color: var(--ml-primary-light, #fde68a);
-  color: var(--ml-primary-dark, #d97706);
+  background-color: var(--ml-primary-light);
+  border-color: var(--ml-primary);
+  color: var(--ml-primary);
 }
 
 .status-badge.success {
-  background-color: var(--ml-success-bg, #dcfce7);
-  color: var(--ml-success, #10b981);
+  background-color: var(--ml-success-bg);
+  border-color: var(--ml-success-border);
+  color: var(--ml-success);
 }
 
 .status-badge.failed {
-  background-color: var(--ml-error-bg, #fee2e2);
-  color: var(--ml-error, #ef4444);
+  background-color: var(--ml-error-bg);
+  border-color: var(--ml-error-border);
+  color: var(--ml-error);
 }
 </style>

@@ -10,18 +10,18 @@
             :class="{ active: viewMode === 'list' }"
             @click="viewMode = 'list'"
             title="列表视图"
-          >📋</button>
+          ><k-icon name="tasks" /></button>
           <button
             class="group-btn"
             :class="{ active: viewMode === 'gallery' }"
             @click="viewMode = 'gallery'"
             title="画廊视图"
-          >🎴</button>
+          ><k-icon name="image" /></button>
         </div>
         <div class="filter-divider"></div>
         <!-- 搜索框 -->
         <div class="search-box">
-          <span class="search-icon">🔍</span>
+          <k-icon name="search" class="search-icon" />
           <input
             v-model="filter.uid"
             class="pop-input small search-input"
@@ -33,7 +33,7 @@
             class="search-clear"
             @click="filter.uid = ''; handleFilterChange()"
             title="清除"
-          >✕</button>
+          ><k-icon name="close" /></button>
         </div>
         <div class="filter-divider"></div>
         <!-- 时间范围 -->
@@ -90,63 +90,48 @@
         <template v-if="selectedIds.size > 0">
           <span class="batch-info">已选 {{ selectedIds.size }} 项</span>
           <button class="pop-btn small danger" @click="openBatchDeleteDialog">
-            🗑️ 删除
+            <k-icon name="delete" /> 删除
           </button>
           <button class="pop-btn small" @click="clearSelection">
             取消
           </button>
           <div class="filter-divider"></div>
         </template>
-        <button class="pop-btn small" @click="fetchData" title="刷新">🔄</button>
+        <button class="pop-btn small" @click="fetchData" title="刷新"><k-icon name="refresh" /></button>
         <button
           class="pop-btn small danger"
           @click="openDeleteFailedDialog"
           :disabled="!stats || stats.byStatus.failed === 0"
           title="删除所有失败任务"
         >
-          ⚠️ 删除失败
+          <k-icon name="warning" /> 删除失败
         </button>
         <button class="pop-btn small danger" @click="openCleanupDialog">
-          🗑️ 清理
+          <k-icon name="delete" /> 清理
         </button>
       </div>
     </div>
 
-    <div class="stats-grid" v-if="stats && viewMode === 'list'">
-      <div class="stat-card pop-card no-hover">
-        <div class="stat-icon total">📋</div>
-        <div class="stat-content">
-          <div class="stat-value">{{ stats.total }}</div>
-          <div class="stat-label">总任务数</div>
-        </div>
+    <div class="stats-bar pop-card no-hover" v-if="stats && viewMode === 'list'">
+      <div class="stat-item">
+        <div class="stat-label"><span class="indicator total"></span>总任务数</div>
+        <div class="stat-value">{{ stats.total }}</div>
       </div>
-      <div class="stat-card pop-card no-hover">
-        <div class="stat-icon success">✅</div>
-        <div class="stat-content">
-          <div class="stat-value success">{{ stats.byStatus.success }}</div>
-          <div class="stat-label">成功</div>
-        </div>
+      <div class="stat-item">
+        <div class="stat-label"><span class="indicator success"></span>成功</div>
+        <div class="stat-value">{{ stats.byStatus.success }}</div>
       </div>
-      <div class="stat-card pop-card no-hover">
-        <div class="stat-icon failed">⚠️</div>
-        <div class="stat-content">
-          <div class="stat-value failed">{{ stats.byStatus.failed }}</div>
-          <div class="stat-label">失败</div>
-        </div>
+      <div class="stat-item">
+        <div class="stat-label"><span class="indicator failed"></span>失败</div>
+        <div class="stat-value">{{ stats.byStatus.failed }}</div>
       </div>
-      <div class="stat-card pop-card no-hover">
-        <div class="stat-icon processing">⏳</div>
-        <div class="stat-content">
-          <div class="stat-value pending">{{ stats.byStatus.pending + stats.byStatus.processing }}</div>
-          <div class="stat-label">进行中</div>
-        </div>
+      <div class="stat-item">
+        <div class="stat-label"><span class="indicator processing"></span>进行中</div>
+        <div class="stat-value">{{ stats.byStatus.pending + stats.byStatus.processing }}</div>
       </div>
-      <div class="stat-card pop-card no-hover">
-        <div class="stat-icon rate">📊</div>
-        <div class="stat-content">
-          <div class="stat-value">{{ stats.successRate }}</div>
-          <div class="stat-label">成功率</div>
-        </div>
+      <div class="stat-item">
+        <div class="stat-label"><span class="indicator rate"></span>成功率</div>
+        <div class="stat-value">{{ stats.successRate }}</div>
       </div>
     </div>
 
@@ -211,13 +196,13 @@
                         @error="handleImageError"
                       />
                       <div v-else-if="asset.kind === 'video'" class="output-thumb video-thumb">
-                        🎬
+                        <k-icon name="image" />
                       </div>
                       <div v-else-if="asset.kind === 'audio'" class="output-thumb audio-thumb">
-                        🎵
+                        <k-icon name="image" />
                       </div>
-                      <div v-else-if="asset.kind === 'text'" class="output-thumb text-thumb">📝</div>
-                      <div v-else-if="asset.kind === 'file'" class="output-thumb file-thumb">📁</div>
+                      <div v-else-if="asset.kind === 'text'" class="output-thumb text-thumb"><k-icon name="edit" /></div>
+                      <div v-else-if="asset.kind === 'file'" class="output-thumb file-thumb"><k-icon name="file-archive" /></div>
                     </template>
                     <span v-if="row.responseSnapshot.length > 3" class="output-more">
                       +{{ row.responseSnapshot.length - 3 }}
@@ -237,7 +222,7 @@
                     class="action-btn delete"
                     title="删除"
                     @click.stop="confirmDeleteTask(row)"
-                  >🗑️</span>
+                  ><k-icon name="delete" /></span>
                 </td>
               </tr>
             </tbody>
@@ -248,7 +233,7 @@
       <!-- 画廊视图 (瀑布流) -->
       <template v-else-if="viewMode === 'gallery'">
         <div v-if="galleryItems.length === 0" class="empty-gallery">
-          <span class="empty-icon">🖼️</span>
+          <k-icon name="image" class="empty-icon" />
           <p>暂无成功生成的图片</p>
         </div>
         <MasonryGrid
@@ -286,7 +271,7 @@
                   />
                 </div>
                 <div v-if="item.kind !== 'audio'" class="gallery-overlay">
-                  <span class="zoom-icon">🔍</span>
+                  <k-icon name="search" class="zoom-icon" />
                 </div>
               </div>
               <!-- 画廊模式下隐藏数据展示，纯图片浏览 -->
@@ -308,9 +293,9 @@
         <span class="page-size-label">条</span>
       </div>
       <div class="page-nav">
-        <button class="pop-btn small" :disabled="page <= 1" @click="goToPage(page - 1)">⬅️</button>
+        <button class="pop-btn small" :disabled="page <= 1" @click="goToPage(page - 1)"><k-icon name="chevron-left" /></button>
         <span class="page-info">{{ page }} / {{ totalPages }}</span>
-        <button class="pop-btn small" :disabled="page >= totalPages" @click="goToPage(page + 1)">➡️</button>
+        <button class="pop-btn small" :disabled="page >= totalPages" @click="goToPage(page + 1)"><k-icon name="chevron-right" /></button>
       </div>
       <div class="page-total">共 {{ total }} 条</div>
     </div>
@@ -328,7 +313,7 @@
         <div class="modal-dialog small pop-card no-hover">
           <div class="modal-header">
             <h3>清理旧任务</h3>
-            <button class="modal-close" @click="cleanupVisible = false">✕</button>
+            <button class="modal-close" @click="cleanupVisible = false"><k-icon name="close" /></button>
           </div>
           <div class="modal-body">
             <div class="cleanup-form">
@@ -350,17 +335,17 @@
         <div class="modal-dialog small pop-card no-hover">
           <div class="modal-header">
             <h3>删除失败任务</h3>
-            <button class="modal-close" @click="deleteFailedVisible = false">✕</button>
+            <button class="modal-close" @click="deleteFailedVisible = false"><k-icon name="close" /></button>
           </div>
           <div class="modal-body">
             <div class="delete-confirm-content">
-              <div class="delete-icon-wrapper">⚠️</div>
+              <div class="delete-icon-wrapper"><k-icon name="warning" /></div>
               <div class="delete-info">
                 <div class="delete-title">确定删除所有失败任务？</div>
                 <div class="delete-task-id" v-if="stats">共 {{ stats.byStatus.failed }} 条失败任务</div>
               </div>
               <div class="delete-warning">
-                ⚠️ 此操作不可恢复
+                <k-icon name="warning" /> 此操作不可恢复
               </div>
             </div>
           </div>
@@ -378,18 +363,18 @@
         <div class="modal-dialog small pop-card no-hover">
           <div class="modal-header">
             <h3>删除确认</h3>
-            <button class="modal-close" @click="deleteConfirmVisible = false">✕</button>
+            <button class="modal-close" @click="deleteConfirmVisible = false"><k-icon name="close" /></button>
           </div>
           <div class="modal-body">
             <div class="delete-confirm-content">
-              <div class="delete-icon-wrapper">🗑️</div>
+              <div class="delete-icon-wrapper"><k-icon name="delete" /></div>
               <div class="delete-info">
                 <div class="delete-title">确定删除此任务？</div>
                 <div class="delete-task-id">#{{ taskToDelete?.id }}</div>
                 <div class="delete-prompt" v-if="taskToDelete">{{ getDeletePromptPreview(taskToDelete) }}</div>
               </div>
               <div class="delete-warning">
-                ⚠️ 此操作不可恢复
+                <k-icon name="warning" /> 此操作不可恢复
               </div>
             </div>
           </div>
@@ -407,11 +392,11 @@
         <div class="modal-dialog small pop-card no-hover">
           <div class="modal-header">
             <h3>批量删除确认</h3>
-            <button class="modal-close" @click="batchDeleteVisible = false">✕</button>
+            <button class="modal-close" @click="batchDeleteVisible = false"><k-icon name="close" /></button>
           </div>
           <div class="modal-body">
             <div class="delete-confirm-content">
-              <div class="delete-icon-wrapper batch">🗑️</div>
+              <div class="delete-icon-wrapper batch"><k-icon name="delete" /></div>
               <div class="delete-info">
                 <div class="delete-title">确定删除选中的任务？</div>
                 <div class="batch-count">
@@ -428,7 +413,7 @@
                 </div>
               </div>
               <div class="delete-warning">
-                ⚠️ 此操作不可恢复，请谨慎操作
+                <k-icon name="warning" /> 此操作不可恢复，请谨慎操作
               </div>
             </div>
           </div>
@@ -448,6 +433,7 @@
 import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import { TaskData, ChannelConfig } from '../types'
 import { taskApi, channelApi } from '../api'
+import { copyToClipboard as copyToClipboardUtil } from '../utils/clipboard'
 import StatusBadge from './StatusBadge.vue'
 import ImageLightbox from './ImageLightbox.vue'
 import AudioPlayer from './AudioPlayer.vue'
@@ -836,12 +822,9 @@ const handleImageError = (e: Event) => {
 }
 
 const copyToClipboard = async (text: string) => {
-  try {
-    await navigator.clipboard.writeText(text)
-    alert('已复制到剪贴板')
-  } catch {
-    alert('复制失败')
-  }
+  const ok = await copyToClipboardUtil(text)
+  if (ok) alert('已复制到剪贴板')
+  else alert('复制失败，请手动复制')
 }
 
 const openInNewTab = (url: string) => {
@@ -870,7 +853,7 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   min-height: 0;
-  gap: 4px;
+  gap: 14px;
   overflow: hidden;
 }
 
@@ -993,67 +976,82 @@ onMounted(() => {
 
 .group-btn.active {
   color: var(--ml-text);
-  background: var(--ml-primary);
-  box-shadow: var(--ml-shadow-sm);
+  background: var(--ml-primary-soft, var(--ml-primary-light));
 }
 
-/* ============ Stats Grid ============ */
-.stats-grid {
+/* ============ 极简数据看板 (Stats Bar) —— 参考 gemini-designer 建议 ============ */
+.stats-bar {
   flex-shrink: 0;
   display: grid;
   grid-template-columns: repeat(5, 1fr);
-  gap: 12px;
   margin-bottom: 0 !important;
+  overflow: hidden;
 }
 
-.stat-card {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 16px;
-}
-
-.stat-icon {
-  width: 40px;
-  height: 40px;
-  border-radius: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 18px;
-  flex-shrink: 0;
-  border: 2px solid var(--ml-border-color);
-}
-
-.stat-icon.total { background: var(--ml-primary-light); }
-.stat-icon.success { background: rgba(76, 175, 80, 0.15); }
-.stat-icon.failed { background: rgba(244, 67, 54, 0.15); }
-.stat-icon.processing { background: rgba(255, 152, 0, 0.15); }
-.stat-icon.rate { background: var(--ml-info-light); }
-
-.stat-content {
+.stat-item {
   display: flex;
   flex-direction: column;
+  justify-content: center;
+  padding: 16px;
+  border-right: var(--ml-border);
+  background: transparent;
+  transition: background-color var(--ml-transition);
 }
 
-.stat-value {
-  font-size: 20px;
-  font-weight: 800;
-  color: var(--ml-text);
-  line-height: 1.2;
+.stat-item:last-child {
+  border-right: none;
 }
 
-.stat-value.success { color: var(--ml-success); }
-.stat-value.failed { color: var(--ml-danger); }
-.stat-value.pending { color: var(--ml-warning); }
+.stat-item:hover {
+  background: var(--ml-bg-alt);
+}
 
 .stat-label {
-  font-size: 11px;
-  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 500;
   color: var(--ml-text-muted);
-  margin-top: 2px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  margin-bottom: 6px;
+}
+
+.indicator {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.indicator.total { background: var(--ml-text-muted); opacity: 0.5; }
+.indicator.success { background: var(--ml-success); }
+.indicator.failed { background: var(--ml-error); }
+.indicator.processing { background: var(--ml-warning); }
+.indicator.rate { background: var(--ml-primary); }
+
+.stat-value {
+  font-size: 26px;
+  font-weight: 600;
+  color: var(--ml-text);
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+/* 响应式：窄屏折叠为 3 列网格 */
+@media (max-width: 900px) {
+  .stats-bar {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  .stat-item {
+    border-bottom: var(--ml-border);
+  }
+  .stat-item:nth-child(3n) {
+    border-right: none;
+  }
+  .stat-item:nth-last-child(-n+2) {
+    border-bottom: none;
+  }
 }
 
 /* ============ 内容区域 ============ */
@@ -1062,7 +1060,6 @@ onMounted(() => {
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 4px;
   /* 隐藏式滚动条 */
   scrollbar-width: thin;
   scrollbar-color: transparent transparent;
@@ -1357,14 +1354,14 @@ onMounted(() => {
   width: 20px;
   height: 20px;
   background: var(--ml-bg);
-  border: 2px solid var(--ml-border-color);
+  border: 1px solid var(--ml-border-color);
   border-radius: 6px;
   transition: all 0.15s;
 }
 
 .checkbox-wrapper input:checked + .checkbox-mark {
   background: var(--ml-primary);
-  border-color: var(--ml-primary-dark);
+  border-color: var(--ml-primary);
 }
 
 .checkbox-mark::after {
@@ -1375,7 +1372,7 @@ onMounted(() => {
   top: 2px;
   width: 5px;
   height: 10px;
-  border: solid var(--ml-text);
+  border: solid #ffffff;
   border-width: 0 2px 2px 0;
   transform: rotate(45deg);
 }

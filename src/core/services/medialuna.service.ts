@@ -105,6 +105,8 @@ export class MediaLunaService extends Service {
     // 初始化核心配置和服务注册中心
     this._configService = new ConfigService(ctx, { configDir: 'media-luna' })
     this._serviceRegistry = new ServiceRegistry(ctx)
+    // 注册自身服务，便于子插件通过 getService('mediaLuna') 访问（避免直接访问 Koishi ctx 触发 inject 警告）
+    this._serviceRegistry.register('mediaLuna', this)
     this._connectorRegistry = new ConnectorRegistry(ctx)
     this._middlewareRegistry = new MiddlewareRegistry(ctx)
 
@@ -193,6 +195,15 @@ export class MediaLunaService extends Service {
   async waitForReady(): Promise<void> {
     if (this._ready) return
     return this._readyPromise
+  }
+
+  /**
+   * 注册插件级服务到 media-luna 服务注册表
+   * 供其他子插件通过 pluginCtx.getService(name) 访问，
+   * 避免直接访问 Koishi ctx.<service> 触发 inject 警告。
+   */
+  registerPluginService<T>(name: string, service: T): () => void {
+    return this._serviceRegistry.register(name, service)
   }
 
   // ============ 默认配置 ============

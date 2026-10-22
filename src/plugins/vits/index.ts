@@ -31,19 +31,11 @@ export default definePlugin({
 
     // 使用 ctx.plugin 注册 vits 服务（与 luna-vits 相同方式）
     ctx.plugin(MediaLunaVits, config)
+    logger.info('Vits service registered')
 
-    // 等待服务就绪后刷新 speakers
-    ctx.on('ready', async () => {
-      const vits = (ctx as any).vits as MediaLunaVits
-      if (vits) {
-        await vits.refreshSpeakers()
-        logger.info('Vits service registered')
-      }
-    })
-
-    // 监听渠道变化，刷新 speakers
+    // 监听渠道变化，刷新 speakers（通过 media-luna 服务注册表获取，避免直接访问 Koishi ctx.vits 触发 inject 警告）
     ctx.on('mediaLuna/channel-updated' as any, async () => {
-      const vits = (ctx as any).vits as MediaLunaVits
+      const vits = pluginCtx.getService<MediaLunaVits>('vits')
       if (vits) {
         await vits.refreshSpeakers()
       }

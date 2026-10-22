@@ -3,15 +3,15 @@
     <div class="stats-card pop-card no-hover" v-if="stats">
       <div class="stats-grid">
         <div class="stat">
-          <div class="value">📁 {{ stats.totalFiles }}</div>
+          <div class="value"><k-icon name="file-archive" /> {{ stats.totalFiles }}</div>
           <div class="label">文件数量</div>
         </div>
         <div class="stat">
-          <div class="value">💾 {{ stats.totalSizeMB.toFixed(1) }} MB</div>
+          <div class="value"><k-icon name="file-archive" /> {{ stats.totalSizeMB.toFixed(1) }} MB</div>
           <div class="label">已用空间</div>
         </div>
         <div class="stat">
-          <div class="value">📊 {{ stats.maxSizeMB }} MB</div>
+          <div class="value"><k-icon name="image" /> {{ stats.maxSizeMB }} MB</div>
           <div class="label">最大容量</div>
         </div>
       </div>
@@ -26,10 +26,10 @@
 
     <div class="actions">
       <button class="pop-btn" @click="refresh">
-        🔄 刷新
+        <k-icon name="refresh" /> 刷新
       </button>
       <button class="pop-btn danger" @click="clear">
-        🗑️ 清空缓存
+        <k-icon name="delete" /> 清空缓存
       </button>
     </div>
   </div>

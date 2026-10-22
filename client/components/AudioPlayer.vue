@@ -3,7 +3,7 @@
     <!-- 可视化区域 -->
     <div class="audio-visual" @click="togglePlay">
       <div class="audio-play-btn" :class="{ playing: isPlaying }">
-        <span>{{ isPlaying ? '⏸' : '▶️' }}</span>
+        <span><k-icon :name="isPlaying ? 'pause' : 'play'" /></span>
       </div>
       <span class="audio-duration-badge">
         {{ currentTimeDisplay }} / {{ durationDisplay }}

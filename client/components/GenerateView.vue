@@ -5,7 +5,7 @@
       <div class="config-card pop-card pop-scrollbar">
         <div class="form-section">
           <div class="section-title">
-            <span class="section-emoji">⚙️</span> 基础配置
+            <k-icon name="settings" class="section-emoji" /> 基础配置
           </div>
 
           <!-- 渠道选择触发器 -->
@@ -26,12 +26,12 @@
                   <component v-else :is="icons.channels" class="selection-icon-fallback"></component>
                   <span class="selection-name">{{ selectedChannel.name }}</span>
                 </div>
-                <span class="clear-btn" @click.stop="clearChannel" title="清除">✕</span>
+                <span class="clear-btn" @click.stop="clearChannel" title="清除"><k-icon name="close" /></span>
               </template>
               <template v-else>
                 <component :is="icons.channels" class="placeholder-icon"></component>
                 <span class="placeholder-text">点击选择渠道</span>
-                <span class="arrow-icon">→</span>
+                <span class="arrow-icon"><k-icon name="chevron-right" /></span>
               </template>
             </div>
           </div>
@@ -54,12 +54,12 @@
                   <component v-else :is="icons.presets" class="selection-icon-fallback"></component>
                   <span class="selection-name">{{ selectedPreset.name }}</span>
                 </div>
-                <span class="clear-btn" @click.stop="clearPreset" title="清除">✕</span>
+                <span class="clear-btn" @click.stop="clearPreset" title="清除"><k-icon name="close" /></span>
               </template>
               <template v-else>
                 <component :is="icons.presets" class="placeholder-icon"></component>
                 <span class="placeholder-text">点击选择预设</span>
-                <span class="arrow-icon">→</span>
+                <span class="arrow-icon"><k-icon name="chevron-right" /></span>
               </template>
             </div>
           </div>
@@ -67,7 +67,7 @@
 
         <div class="form-section flex-grow">
           <div class="section-title">
-            <span class="section-emoji">✏️</span> 提示词
+            <k-icon name="edit" class="section-emoji" /> 提示词
           </div>
           <textarea
             v-model="form.prompt"
@@ -80,7 +80,7 @@
         <!-- 文件上传区域 -->
         <div class="form-section">
           <div class="section-title">
-            <span class="section-emoji">🖼️</span> 参考图片
+            <k-icon name="image" class="section-emoji" /> 参考图片
           </div>
           <div class="upload-area">
             <!-- 已上传的图片列表 -->
@@ -88,9 +88,9 @@
               <div v-for="(file, index) in fileList" :key="file.uid" class="upload-item">
                 <img v-if="isImageFile(file)" :src="file.url" class="upload-thumb" />
                 <video v-else-if="isVideoFile(file)" :src="file.url" class="upload-thumb" />
-                <div v-else class="upload-thumb unknown-file">❓</div>
+                <div v-else class="upload-thumb unknown-file"><k-icon name="file-archive" /></div>
                 <div class="upload-overlay" @click="removeFile(index)">
-                  <span>🗑️</span>
+                  <k-icon name="delete" />
                 </div>
               </div>
             </div>
@@ -109,7 +109,7 @@
                 style="display: none"
                 @change="handleFileSelect"
               />
-              <span class="upload-icon">➕</span>
+              <span class="upload-icon"><k-icon name="add" /></span>
             </div>
             <div class="upload-tip">点击或拖拽上传参考图片</div>
           </div>
@@ -121,14 +121,14 @@
             @click="clearForm"
             title="清除除渠道外的所有数据"
           >
-            🗑️ 清空
+            <k-icon name="delete" /> 清空
           </button>
           <button
             class="pop-btn primary generate-btn"
             @click="generate"
           >
             <span v-if="pendingCount > 0" class="pending-badge">{{ pendingCount }}</span>
-            <span v-else>✨</span>
+            <k-icon v-else name="generate" />
             开始生成
           </button>
         </div>
@@ -142,12 +142,12 @@
         <div class="picker-header">
           <div class="picker-title-row">
             <div class="picker-title">
-              <span class="picker-emoji">🔗</span>
+              <k-icon name="channels" class="picker-emoji" />
               <span>选择渠道</span>
               <span class="picker-count">{{ filteredChannels.length }}</span>
             </div>
             <button class="pop-btn small" @click="pickerMode = null">
-              ✕
+              <k-icon name="close" />
             </button>
           </div>
           <div class="picker-filters">
@@ -155,7 +155,7 @@
               v-model="channelSearch"
               type="text"
               class="pop-input picker-search"
-              placeholder="🔍 搜索..."
+              placeholder="搜索..."
             />
             <select
               v-model="channelConnectorFilter"
@@ -183,13 +183,13 @@
                 v-if="getConnectorIconUrl(channel.connectorId)"
                 :src="getConnectorIconUrl(channel.connectorId)"
               />
-              <span v-else>🔗</span>
+              <k-icon v-else name="channels" />
             </div>
             <div class="picker-card-name">{{ channel.name }}</div>
-            <span v-if="form.channel === channel.id" class="picker-card-check">✓</span>
+            <span v-if="form.channel === channel.id" class="picker-card-check"><k-icon name="check" /></span>
           </div>
           <div v-if="filteredChannels.length === 0" class="picker-empty">
-            <span class="empty-emoji">🔍</span>
+            <k-icon name="search" class="empty-emoji" />
             <span>没有找到匹配的渠道</span>
           </div>
         </div>
@@ -200,12 +200,12 @@
         <div class="picker-header">
           <div class="picker-title-row">
             <div class="picker-title">
-              <span class="picker-emoji">📦</span>
+              <k-icon name="presets" class="picker-emoji" />
               <span>选择预设</span>
               <span class="picker-count">{{ filteredPresetsCount }}</span>
             </div>
             <button class="pop-btn small" @click="pickerMode = null">
-              ✕
+              <k-icon name="close" />
             </button>
           </div>
           <div class="picker-filters">
@@ -213,7 +213,7 @@
               v-model="presetSearch"
               type="text"
               class="pop-input picker-search"
-              placeholder="🔍 搜索..."
+              placeholder="搜索..."
             />
             <select
               v-model="presetSourceFilter"
@@ -239,7 +239,7 @@
                   <img :src="preset.thumbnail" loading="lazy" />
                 </div>
                 <div class="card-thumb empty" v-else>
-                  <span>🖼️</span>
+                  <k-icon name="image" />
                 </div>
                 <!-- 底部信息 -->
                 <div class="card-info">
@@ -250,12 +250,12 @@
                   {{ preset.source === 'api' ? '远程' : '本地' }}
                 </div>
                 <!-- 选中标记 -->
-                <span v-if="presetId === preset.id" class="card-check">✓</span>
+                <span v-if="presetId === preset.id" class="card-check"><k-icon name="check" /></span>
               </div>
             </template>
           </div>
           <div v-if="filteredPresetsCount === 0" class="picker-empty">
-            <span class="empty-emoji">🔍</span>
+            <k-icon name="search" class="empty-emoji" />
             <span>没有找到匹配的预设</span>
           </div>
         </div>
@@ -271,7 +271,7 @@
               <span v-if="pendingCount > 1" class="task-count">({{ pendingCount }} 个任务)</span>
             </p>
             <p class="generating-timer">
-              ⏱️ 已用时间: {{ formatElapsedTime(elapsedTime) }}
+              <span>已用时间: {{ formatElapsedTime(elapsedTime) }}</span>
             </p>
             <p class="generating-hint" v-if="currentTaskId">任务 ID: {{ currentTaskId }}</p>
           </div>
@@ -289,7 +289,7 @@
                 <img :src="asset.url" @click="openImagePreview(idx)" class="clickable-image" />
                 <div class="output-actions">
                   <a :href="asset.url" target="_blank" class="action-btn" download>
-                    ⬇️
+                    <k-icon name="download" />
                   </a>
                 </div>
               </template>
@@ -308,7 +308,7 @@
                   />
                   <div class="output-actions audio-actions">
                     <a :href="asset.url" target="_blank" class="action-btn" download>
-                      ⬇️
+                      <k-icon name="download" />
                     </a>
                   </div>
                 </div>
@@ -316,7 +316,7 @@
               <!-- 其他文件 -->
               <template v-else-if="asset.kind === 'file'">
                 <a :href="asset.url" target="_blank" class="file-link">
-                  📄 {{ asset.meta?.filename || '下载文件' }}
+                  <k-icon name="file-archive" /> {{ asset.meta?.filename || '下载文件' }}
                 </a>
               </template>
               <!-- 文本 -->
@@ -331,13 +331,13 @@
           </div>
           <div class="result-meta">
             <span class="meta-item success-badge">
-              ✅ 生成成功
+              <k-icon name="check" /> 生成成功
             </span>
             <span class="meta-item" v-if="result.duration">
-              ⏱️ 耗时: {{ formatElapsedTime(result.duration) }}
+              耗时: {{ formatElapsedTime(result.duration) }}
             </span>
             <span class="meta-item" v-if="result.taskId">
-              📋 任务 ID: {{ result.taskId }}
+              <k-icon name="tasks" /> 任务 ID: {{ result.taskId }}
             </span>
           </div>
         </div>
@@ -345,7 +345,7 @@
         <!-- 失败状态 -->
         <div v-else class="error-result">
           <div class="error-content pop-card">
-            <span class="error-icon">⚠️</span>
+            <span class="error-icon"><k-icon name="warning" /></span>
             <div class="error-info">
               <p class="error-title">生成失败</p>
               <p class="error-msg">{{ result.error || '未知错误' }}</p>
@@ -354,14 +354,14 @@
             </div>
           </div>
           <button class="pop-btn retry-btn" @click="generate">
-            🔄 重新生成
+            <k-icon name="refresh" /> 重新生成
           </button>
         </div>
       </div>
 
       <!-- 空状态 -->
       <div v-else class="empty-state">
-        <span class="empty-icon">🖼️</span>
+        <span class="empty-icon"><k-icon name="image" /></span>
         <p>在左侧配置并点击生成</p>
       </div>
     </div>
@@ -999,7 +999,7 @@ onUnmounted(() => {
 .form-section {
   margin-bottom: 1.5rem;
   padding-bottom: 1.25rem;
-  border-bottom: 2px dashed var(--ml-border-color);
+  border-bottom: 1px solid var(--ml-border-color);
 }
 
 .form-section:last-of-type {
@@ -1030,7 +1030,9 @@ onUnmounted(() => {
 }
 
 .section-emoji {
-  font-size: 1rem;
+  width: 15px;
+  height: 15px;
+  color: var(--ml-primary);
 }
 
 .form-item {
@@ -1078,13 +1080,13 @@ onUnmounted(() => {
 }
 
 .selection-trigger.active {
-  border-color: var(--ml-primary-dark);
+  border-color: var(--ml-primary);
   background: var(--ml-primary-light);
 }
 
 .selection-trigger.selected {
   background: var(--ml-primary-light);
-  border-color: var(--ml-primary-dark);
+  border-color: var(--ml-primary);
 }
 
 .selection-info {
@@ -1187,7 +1189,7 @@ onUnmounted(() => {
   flex-direction: column;
   gap: 0.75rem;
   padding-bottom: 1rem;
-  border-bottom: 2px dashed var(--ml-border-color);
+  border-bottom: 1px solid var(--ml-border-color);
   margin-bottom: 1rem;
   flex-shrink: 0;
 }
@@ -1208,7 +1210,9 @@ onUnmounted(() => {
 }
 
 .picker-emoji {
-  font-size: 1.2rem;
+  width: 18px;
+  height: 18px;
+  color: var(--ml-primary);
 }
 
 .picker-count {
@@ -1350,7 +1354,8 @@ onUnmounted(() => {
 }
 
 .empty-emoji {
-  font-size: 2.5rem;
+  width: 40px;
+  height: 40px;
   opacity: 0.5;
 }
 
@@ -1589,7 +1594,8 @@ onUnmounted(() => {
 }
 
 .empty-icon {
-  font-size: 4rem;
+  width: 48px;
+  height: 48px;
   margin-bottom: 1rem;
   opacity: 0.4;
 }
@@ -1780,8 +1786,8 @@ onUnmounted(() => {
   flex-wrap: wrap;
   color: var(--ml-text-secondary);
   font-size: 0.9rem;
-  font-weight: 600;
-  border-top: 2px dashed var(--ml-border-color);
+  font-weight: 500;
+  border-top: 1px solid var(--ml-border-color);
   padding-top: 1rem;
 }
 
@@ -1815,7 +1821,9 @@ onUnmounted(() => {
 }
 
 .error-icon {
-  font-size: 3rem;
+  width: 32px;
+  height: 32px;
+  color: var(--ml-error);
 }
 
 .error-info {

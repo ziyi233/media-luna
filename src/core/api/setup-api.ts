@@ -83,7 +83,7 @@ export function registerSetupApi(ctx: Context): void {
       logger.error('Failed to get setup status:', error)
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
-  })
+  }, { authority: 3 })
 
   // 获取存储配置字段定义
   console.addListener('media-luna/setup/storage/fields', async () => {
@@ -100,7 +100,7 @@ export function registerSetupApi(ctx: Context): void {
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
-  })
+  }, { authority: 3 })
 
   // 获取当前存储配置
   console.addListener('media-luna/setup/storage/get', async () => {
@@ -113,7 +113,7 @@ export function registerSetupApi(ctx: Context): void {
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
-  })
+  }, { authority: 3 })
 
   // 更新存储配置
   console.addListener('media-luna/setup/storage/update', async (options: Record<string, any>) => {
@@ -147,7 +147,7 @@ export function registerSetupApi(ctx: Context): void {
       logger.error('Failed to update storage config:', error)
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
-  })
+  }, { authority: 3 })
 
   // 生成验证码（WebUI 发起绑定）
   console.addListener('media-luna/setup/verify-code/generate', async ({ uid }: { uid: number }) => {
@@ -181,7 +181,7 @@ export function registerSetupApi(ctx: Context): void {
       logger.error('Failed to generate verify code:', error)
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
-  })
+  }, { authority: 3 })
 
   // 验证验证码（用户在聊天平台输入后确认）
   console.addListener('media-luna/setup/verify-code/verify', async ({ code, uid }: { code: string, uid: number }) => {
@@ -206,7 +206,7 @@ export function registerSetupApi(ctx: Context): void {
       logger.error('Failed to verify code:', error)
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
-  })
+  }, { authority: 3 })
 
   // 直接绑定 UID（跳过验证码，管理员操作）
   console.addListener('media-luna/setup/bind-uid', async ({ uid }: { uid: number }) => {
@@ -232,7 +232,7 @@ export function registerSetupApi(ctx: Context): void {
       logger.error('Failed to bind uid:', error)
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
-  })
+  }, { authority: 3 })
 
   // 获取可用的 Koishi 用户列表（用于直接绑定）
   console.addListener('media-luna/setup/users', async () => {
@@ -251,7 +251,7 @@ export function registerSetupApi(ctx: Context): void {
       logger.error('Failed to get users:', error)
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
-  })
+  }, { authority: 3 })
 
   // 完成设置（标记设置完成）
   console.addListener('media-luna/setup/complete', async () => {
@@ -263,5 +263,5 @@ export function registerSetupApi(ctx: Context): void {
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
-  })
+  }, { authority: 3 })
 }

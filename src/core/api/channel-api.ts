@@ -17,7 +17,7 @@ export function registerChannelApi(ctx: Context): void {
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
-  })
+  }, { authority: 3 })
 
   // 获取启用的渠道列表
   console.addListener('media-luna/channels/list-enabled', async () => {
@@ -27,7 +27,7 @@ export function registerChannelApi(ctx: Context): void {
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
-  })
+  }, { authority: 3 })
 
   // 获取单个渠道
   console.addListener('media-luna/channels/get', async ({ id }: { id: number }) => {
@@ -40,7 +40,7 @@ export function registerChannelApi(ctx: Context): void {
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
-  })
+  }, { authority: 3 })
 
   // 创建渠道
   console.addListener('media-luna/channels/create', async (data: Partial<Omit<ChannelConfig, 'id'>>) => {
@@ -78,7 +78,7 @@ export function registerChannelApi(ctx: Context): void {
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
-  })
+  }, { authority: 3 })
 
   // 更新渠道
   console.addListener('media-luna/channels/update', async ({ id, data }: { id: number, data: Partial<Omit<ChannelConfig, 'id'>> }) => {
@@ -105,7 +105,7 @@ export function registerChannelApi(ctx: Context): void {
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
-  })
+  }, { authority: 3 })
 
   // 删除渠道
   console.addListener('media-luna/channels/delete', async ({ id }: { id: number }) => {
@@ -118,7 +118,7 @@ export function registerChannelApi(ctx: Context): void {
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
-  })
+  }, { authority: 3 })
 
   // 切换渠道启用状态
   console.addListener('media-luna/channels/toggle', async ({ id, enabled }: { id: number, enabled: boolean }) => {
@@ -131,7 +131,7 @@ export function registerChannelApi(ctx: Context): void {
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
-  })
+  }, { authority: 3 })
 
   // 获取所有渠道标签
   console.addListener('media-luna/channels/tags', async () => {
@@ -141,7 +141,7 @@ export function registerChannelApi(ctx: Context): void {
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
-  })
+  }, { authority: 3 })
 
   // 根据标签获取渠道
   console.addListener('media-luna/channels/by-tags', async ({ tags, matchAll }: { tags: string[], matchAll?: boolean }) => {
@@ -153,5 +153,5 @@ export function registerChannelApi(ctx: Context): void {
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
-  })
+  }, { authority: 3 })
 }

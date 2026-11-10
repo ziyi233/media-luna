@@ -67,7 +67,7 @@ export function registerTaskApi(ctx: Context): void {
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
-  })
+  }, { authority: 3 })
 
   // 获取任务详情
   console.addListener('media-luna/tasks/get', async ({ id }: { id: number }) => {
@@ -83,7 +83,7 @@ export function registerTaskApi(ctx: Context): void {
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
-  })
+  }, { authority: 3 })
 
   // 删除任务
   console.addListener('media-luna/tasks/delete', async ({ id }: { id: number }) => {
@@ -99,7 +99,7 @@ export function registerTaskApi(ctx: Context): void {
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
-  })
+  }, { authority: 3 })
 
   // 获取任务统计（单次查询）
   console.addListener('media-luna/tasks/stats', async ({ channelId, startDate }: { channelId?: number, startDate?: string } = {}) => {
@@ -149,7 +149,7 @@ export function registerTaskApi(ctx: Context): void {
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
-  })
+  }, { authority: 3 })
 
   // 清理旧任务
   console.addListener('media-luna/tasks/cleanup', async ({ days }: { days?: number } = {}) => {
@@ -177,7 +177,7 @@ export function registerTaskApi(ctx: Context): void {
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
-  })
+  }, { authority: 3 })
 
   // 删除指定状态的任务（如删除所有失败任务）
   console.addListener('media-luna/tasks/delete-by-status', async ({ status }: { status: TaskStatus }) => {
@@ -203,7 +203,7 @@ export function registerTaskApi(ctx: Context): void {
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
-  })
+  }, { authority: 3 })
 
   // 获取用户最近的任务
   console.addListener('media-luna/tasks/recent', async function (this: any, { uid, limit }: { uid?: number, limit?: number }) {
@@ -222,7 +222,7 @@ export function registerTaskApi(ctx: Context): void {
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
-  })
+  }, { authority: 3 })
 
   // 获取当前登录用户的任务（自动使用 session uid 或 webui-auth 绑定的 uid）
   console.addListener('media-luna/tasks/my', async function (this: any, options: {
@@ -269,7 +269,7 @@ export function registerTaskApi(ctx: Context): void {
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
-  })
+  }, { authority: 3 })
 
   // 获取当前用户信息（用于前端判断登录/绑定状态）
   console.addListener('media-luna/auth/me', async function (this: any) {
@@ -301,7 +301,7 @@ export function registerTaskApi(ctx: Context): void {
     }
 
     return { success: true, data: { loggedIn: false } }
-  })
+  }, { authority: 3 })
 
   // ============ 画廊 API ============
 
@@ -330,7 +330,7 @@ export function registerTaskApi(ctx: Context): void {
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
-  })
+  }, { authority: 3 })
 
   // 获取当前用户最近生成的图片（扁平化列表）
   console.addListener('media-luna/gallery/recent-images', async function (this: any, { limit }: { limit?: number } = {}) {
@@ -348,7 +348,7 @@ export function registerTaskApi(ctx: Context): void {
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
-  })
+  }, { authority: 3 })
 
   // 获取指定用户的画廊（管理员用）
   console.addListener('media-luna/gallery/user', async (options: {
@@ -375,7 +375,7 @@ export function registerTaskApi(ctx: Context): void {
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
-  })
+  }, { authority: 3 })
 
   // 批量获取用户信息（用于画廊显示）
   // 注意：头像和用户名存储在平台侧，需要通过 binding 表查找平台账号，再通过 bot 获取
@@ -452,5 +452,5 @@ export function registerTaskApi(ctx: Context): void {
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
-  })
+  }, { authority: 3 })
 }

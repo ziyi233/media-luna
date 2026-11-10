@@ -49,7 +49,7 @@ export function registerChatLunaApi(ctx: Context, logger: any) {
       logger.error('Failed to get platforms:', error)
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
-  })
+  }, { authority: 3 })
 
   // 获取指定平台下的模型列表
   koishiConsole.addListener('media-luna/chatluna/models', async ({ platform }: { platform?: string }) => {
@@ -77,7 +77,7 @@ export function registerChatLunaApi(ctx: Context, logger: any) {
       logger.error('Failed to get models:', error)
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
-  })
+  }, { authority: 3 })
 
   // 获取所有模型（平台/模型名格式）
   koishiConsole.addListener('media-luna/chatluna/all-models', async () => {
@@ -100,7 +100,7 @@ export function registerChatLunaApi(ctx: Context, logger: any) {
       logger.error('Failed to get all models:', error)
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
-  })
+  }, { authority: 3 })
 
   // ============ Media Luna 渠道/预设 API（用于工具配置下拉选项） ============
 
@@ -130,7 +130,7 @@ export function registerChatLunaApi(ctx: Context, logger: any) {
       logger.error('Failed to get channel options:', error)
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
-  })
+  }, { authority: 3 })
 
   // 获取预设选项列表
   koishiConsole.addListener('media-luna/chatluna/preset-options', async () => {
@@ -156,7 +156,7 @@ export function registerChatLunaApi(ctx: Context, logger: any) {
       logger.error('Failed to get preset options:', error)
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
-  })
+  }, { authority: 3 })
 
   // 获取所有预设（包含描述，用于预设查看工具）
   koishiConsole.addListener('media-luna/chatluna/preset-list', async () => {
@@ -183,7 +183,7 @@ export function registerChatLunaApi(ctx: Context, logger: any) {
       logger.error('Failed to get preset list:', error)
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
-  })
+  }, { authority: 3 })
 
   logger.info('ChatLuna API registered')
 }

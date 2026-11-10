@@ -17,7 +17,7 @@ export function registerPluginApi(ctx: Context): void {
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
-  })
+  }, { authority: 3 })
 
   // 获取单个插件信息
   console.addListener('media-luna/plugins/get', async ({ id }: { id: string }) => {
@@ -31,7 +31,7 @@ export function registerPluginApi(ctx: Context): void {
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
-  })
+  }, { authority: 3 })
 
   // 更新插件配置
   console.addListener('media-luna/plugins/update-config', async ({
@@ -52,7 +52,7 @@ export function registerPluginApi(ctx: Context): void {
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
-  })
+  }, { authority: 3 })
 
   // 启用插件
   console.addListener('media-luna/plugins/enable', async ({ id }: { id: string }) => {
@@ -67,7 +67,7 @@ export function registerPluginApi(ctx: Context): void {
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
-  })
+  }, { authority: 3 })
 
   // 禁用插件
   console.addListener('media-luna/plugins/disable', async ({ id }: { id: string }) => {
@@ -82,7 +82,7 @@ export function registerPluginApi(ctx: Context): void {
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
-  })
+  }, { authority: 3 })
 
   // ============ 外部插件管理 ============
 
@@ -94,7 +94,7 @@ export function registerPluginApi(ctx: Context): void {
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
-  })
+  }, { authority: 3 })
 
   // 添加外部插件
   console.addListener('media-luna/plugins/external/add', async ({ moduleName }: { moduleName: string }) => {
@@ -104,7 +104,7 @@ export function registerPluginApi(ctx: Context): void {
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
-  })
+  }, { authority: 3 })
 
   // 移除外部插件
   console.addListener('media-luna/plugins/external/remove', async ({ moduleName }: { moduleName: string }) => {
@@ -114,5 +114,5 @@ export function registerPluginApi(ctx: Context): void {
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
-  })
+  }, { authority: 3 })
 }

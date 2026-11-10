@@ -49,7 +49,7 @@ export function registerCacheApi(ctx: Context): void {
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
-  })
+  }, { authority: 3 })
 
   // 从 URL 下载并缓存
   console.addListener('media-luna/cache/cache-url', async ({ url }: { url: string }) => {
@@ -72,7 +72,7 @@ export function registerCacheApi(ctx: Context): void {
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
-  })
+  }, { authority: 3 })
 
   // 获取缓存文件信息
   console.addListener('media-luna/cache/get', async ({ id }: { id: string }) => {
@@ -100,7 +100,7 @@ export function registerCacheApi(ctx: Context): void {
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
-  })
+  }, { authority: 3 })
 
   // 读取缓存文件内容（返回 base64 Data URL）
   console.addListener('media-luna/cache/read', async ({ id }: { id: string }) => {
@@ -116,7 +116,7 @@ export function registerCacheApi(ctx: Context): void {
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
-  })
+  }, { authority: 3 })
 
   // 删除缓存文件
   console.addListener('media-luna/cache/delete', async ({ id }: { id: string }) => {
@@ -129,7 +129,7 @@ export function registerCacheApi(ctx: Context): void {
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
-  })
+  }, { authority: 3 })
 
   // 获取缓存统计信息
   console.addListener('media-luna/cache/stats', async () => {
@@ -142,7 +142,7 @@ export function registerCacheApi(ctx: Context): void {
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
-  })
+  }, { authority: 3 })
 
   // 清空所有缓存
   console.addListener('media-luna/cache/clear', async () => {
@@ -155,7 +155,7 @@ export function registerCacheApi(ctx: Context): void {
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
-  })
+  }, { authority: 3 })
 
   // 测试存储连接
   console.addListener('media-luna/cache/test', async () => {
@@ -177,5 +177,5 @@ export function registerCacheApi(ctx: Context): void {
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
-  })
+  }, { authority: 3 })
 }

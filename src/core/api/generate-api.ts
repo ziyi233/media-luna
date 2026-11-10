@@ -142,7 +142,7 @@ export function registerGenerateApi(ctx: Context): void {
       logger.error('Generate exception:', error)
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
-  })
+  }, { authority: 3 })
 
   // 预览生成请求（不实际执行）
   console.addListener('media-luna/generate/preview', async (request: {
@@ -200,5 +200,5 @@ export function registerGenerateApi(ctx: Context): void {
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
-  })
+  }, { authority: 3 })
 }

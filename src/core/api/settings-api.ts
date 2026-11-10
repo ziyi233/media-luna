@@ -64,7 +64,7 @@ export function registerSettingsApi(ctx: Context): void {
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
-  })
+  }, { authority: 3 })
 
   // 获取所有设置面板
   console.addListener('media-luna/settings/panels', async () => {
@@ -74,7 +74,7 @@ export function registerSettingsApi(ctx: Context): void {
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
-  })
+  }, { authority: 3 })
 
   // 获取单个设置面板配置
   console.addListener('media-luna/settings/get', async ({ id }: { id: string }) => {
@@ -88,7 +88,7 @@ export function registerSettingsApi(ctx: Context): void {
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
-  })
+  }, { authority: 3 })
 
   // 更新设置面板配置（仅支持 custom 类型）
   console.addListener('media-luna/settings/update', async ({
@@ -114,7 +114,7 @@ export function registerSettingsApi(ctx: Context): void {
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
-  })
+  }, { authority: 3 })
 
   // 获取远程预设同步配置
   console.addListener('media-luna/settings/remote-presets/config', async () => {
@@ -124,7 +124,7 @@ export function registerSettingsApi(ctx: Context): void {
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
-  })
+  }, { authority: 3 })
 
   // 更新远程预设同步配置
   console.addListener('media-luna/settings/remote-presets/update', async ({
@@ -143,7 +143,7 @@ export function registerSettingsApi(ctx: Context): void {
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
-  })
+  }, { authority: 3 })
 
   // 手动触发远程预设同步
   console.addListener('media-luna/settings/remote-presets/sync', async () => {
@@ -166,7 +166,7 @@ export function registerSettingsApi(ctx: Context): void {
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
-  })
+  }, { authority: 3 })
 
   // 强制同步（清除 ETag 缓存后同步）
   console.addListener('media-luna/settings/remote-presets/force-sync', async () => {
@@ -191,5 +191,5 @@ export function registerSettingsApi(ctx: Context): void {
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
-  })
+  }, { authority: 3 })
 }

@@ -40,7 +40,7 @@ export function registerPresetApi(ctx: Context): void {
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
-  })
+  }, { authority: 3 })
 
   // 获取单个预设
   console.addListener('media-luna/presets/get', async ({ id }: { id: number }) => {
@@ -56,7 +56,7 @@ export function registerPresetApi(ctx: Context): void {
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
-  })
+  }, { authority: 3 })
 
   // 创建预设
   console.addListener('media-luna/presets/create', async (data: Partial<Omit<PresetData, 'id'>>) => {
@@ -92,7 +92,7 @@ export function registerPresetApi(ctx: Context): void {
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
-  })
+  }, { authority: 3 })
 
   // 更新预设
   console.addListener('media-luna/presets/update', async ({ id, data }: { id: number, data: Partial<Omit<PresetData, 'id'>> }) => {
@@ -117,7 +117,7 @@ export function registerPresetApi(ctx: Context): void {
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
-  })
+  }, { authority: 3 })
 
   // 删除预设
   console.addListener('media-luna/presets/delete', async ({ id }: { id: number }) => {
@@ -133,7 +133,7 @@ export function registerPresetApi(ctx: Context): void {
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
-  })
+  }, { authority: 3 })
 
   // 切换预设启用状态
   console.addListener('media-luna/presets/toggle', async ({ id, enabled }: { id: number, enabled: boolean }) => {
@@ -149,7 +149,7 @@ export function registerPresetApi(ctx: Context): void {
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
-  })
+  }, { authority: 3 })
 
   // 获取所有预设标签
   console.addListener('media-luna/presets/tags', async () => {
@@ -162,7 +162,7 @@ export function registerPresetApi(ctx: Context): void {
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
-  })
+  }, { authority: 3 })
 
   // 根据标签获取预设
   console.addListener('media-luna/presets/by-tags', async ({ tags, matchAll }: { tags: string[], matchAll?: boolean }) => {
@@ -177,7 +177,7 @@ export function registerPresetApi(ctx: Context): void {
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
-  })
+  }, { authority: 3 })
 
   // 获取与渠道匹配的预设
   console.addListener('media-luna/presets/matching', async ({ channelId }: { channelId: number }) => {
@@ -194,7 +194,7 @@ export function registerPresetApi(ctx: Context): void {
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
-  })
+  }, { authority: 3 })
 
   // 复制预设
   console.addListener('media-luna/presets/copy', async ({ id }: { id: number }) => {
@@ -229,7 +229,7 @@ export function registerPresetApi(ctx: Context): void {
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
-  })
+  }, { authority: 3 })
 
   // ========== 远程同步 API ==========
 
@@ -277,7 +277,7 @@ export function registerPresetApi(ctx: Context): void {
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
-  })
+  }, { authority: 3 })
 
   // 获取同步配置
   console.addListener('media-luna/presets/sync-config', async () => {
@@ -287,7 +287,7 @@ export function registerPresetApi(ctx: Context): void {
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
-  })
+  }, { authority: 3 })
 
   // 更新同步配置
   console.addListener('media-luna/presets/sync-config/update', async (config: {
@@ -302,7 +302,7 @@ export function registerPresetApi(ctx: Context): void {
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
-  })
+  }, { authority: 3 })
 
   // 清空所有远程同步的预设
   console.addListener('media-luna/presets/clear-remote', async () => {
@@ -323,7 +323,7 @@ export function registerPresetApi(ctx: Context): void {
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
-  })
+  }, { authority: 3 })
 
   // ========== 上传 API ==========
 
@@ -346,7 +346,7 @@ export function registerPresetApi(ctx: Context): void {
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
-  })
+  }, { authority: 3 })
 
   // 上传预设到远程
   console.addListener('media-luna/presets/upload', async (data: {
@@ -407,7 +407,7 @@ export function registerPresetApi(ctx: Context): void {
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
-  })
+  }, { authority: 3 })
 
   // 上传任务生成结果到远程
   console.addListener('media-luna/presets/upload-task', async (data: {
@@ -500,5 +500,5 @@ export function registerPresetApi(ctx: Context): void {
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
-  })
+  }, { authority: 3 })
 }

@@ -56,7 +56,7 @@ export function registerMiddlewareApi(ctx: Context): void {
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
-  })
+  }, { authority: 3 })
 
   // 获取单个中间件配置
   console.addListener('media-luna/middlewares/get', async ({ name }: { name: string }) => {
@@ -86,7 +86,7 @@ export function registerMiddlewareApi(ctx: Context): void {
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
-  })
+  }, { authority: 3 })
 
   // 更新中间件配置
   console.addListener('media-luna/middlewares/update', async ({ name, data }: {
@@ -124,7 +124,7 @@ export function registerMiddlewareApi(ctx: Context): void {
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
-  })
+  }, { authority: 3 })
 
   // 重置中间件配置
   console.addListener('media-luna/middlewares/reset', async ({ name }: { name: string }) => {
@@ -142,7 +142,7 @@ export function registerMiddlewareApi(ctx: Context): void {
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
-  })
+  }, { authority: 3 })
 
   // 获取中间件执行顺序
   console.addListener('media-luna/middlewares/execution-order', async () => {
@@ -165,7 +165,7 @@ export function registerMiddlewareApi(ctx: Context): void {
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
-  })
+  }, { authority: 3 })
 
   // 获取中间件注册的卡片展示字段及其配置组的全局配置
   console.addListener('media-luna/middlewares/card-fields', async () => {
@@ -217,5 +217,5 @@ export function registerMiddlewareApi(ctx: Context): void {
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
-  })
+  }, { authority: 3 })
 }

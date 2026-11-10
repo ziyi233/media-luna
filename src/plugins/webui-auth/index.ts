@@ -115,13 +115,13 @@ export default definePlugin({
             uid
           }
         }
-      })
+      }, { authority: 3 })
 
       // 清除绑定
       console.addListener('media-luna/webui-auth/clear', async () => {
         authService.clearBind()
         return { success: true }
-      })
+      }, { authority: 3 })
     }
 
     pluginCtx.logger.info('WebUI auth plugin loaded, command: %s', commandName)

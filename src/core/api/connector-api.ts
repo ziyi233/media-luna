@@ -16,7 +16,7 @@ export function registerConnectorApi(ctx: Context): void {
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
-  })
+  }, { authority: 3 })
 
   // 获取单个连接器详情
   console.addListener('media-luna/connectors/get', async ({ id }: { id: string }) => {
@@ -38,7 +38,7 @@ export function registerConnectorApi(ctx: Context): void {
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
-  })
+  }, { authority: 3 })
 
   // 获取连接器配置字段
   console.addListener('media-luna/connectors/fields', async ({ id }: { id: string }) => {
@@ -51,7 +51,7 @@ export function registerConnectorApi(ctx: Context): void {
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
-  })
+  }, { authority: 3 })
 
   // 获取连接器 Schema（用于动态表单）
   console.addListener('media-luna/connectors/schema', async () => {
@@ -61,5 +61,5 @@ export function registerConnectorApi(ctx: Context): void {
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
-  })
+  }, { authority: 3 })
 }
